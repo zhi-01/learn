@@ -515,7 +515,7 @@ button { cursor: pointer; }
     </div>
 
     <footer class="app-footer" id="app-footer">
-      <span>Z · 版本 1.3.0 · 无账号、无云同步、无联网上传</span>
+      <span>Z · 版本 1.4.0 · 无账号、无云同步、无联网上传</span>
       <span class="spacer"></span>
       <span>数据仅存本机；请定期导出 JSON 备份</span>
     </footer>
@@ -610,7 +610,7 @@ button { cursor: pointer; }
     dirName: 'zapp.bookDirName.v1'
   };
   var APP_NAME = 'Z';
-  var APP_VERSION = '1.3.0';
+  var APP_VERSION = '1.4.0';
   var TRASH_TTL_MS = 72 * 60 * 60 * 1000;
   var SNOOZE_MS = 10 * 60 * 1000;
   var UNDO_LIMIT = 20;
@@ -2471,6 +2471,56 @@ button { cursor: pointer; }
     }
     return step();
   }
+  /* 目录句柄可用性检查 + 可操作的错误说明 */
+  function ensureDirWritable() {
+    if (!state.dirHandle || !state.dirReady) {
+      return Promise.reject(new Error('尚未授权 book 文件夹'));
+    }
+    var h = state.dirHandle;
+    var permCheck;
+    if (typeof h.queryPermission !== 'function') {
+      permCheck = Promise.resolve(true);
+    } else {
+      permCheck = h.queryPermission({ mode: 'readwrite' }).then(function (p) {
+        if (p === 'granted') return true;
+        if (typeof h.requestPermission !== 'function') throw new Error('没有 book 文件夹的写入权限');
+        return h.requestPermission({ mode: 'readwrite' }).then(function (p2) {
+          if (p2 === 'granted') return true;
+          throw new Error('没有 book 文件夹的写入权限，请在「选择 / 更换 book 文件夹」中重新授权');
+        });
+      });
+    }
+    /* 权限可能仍是 granted，但目录已被移动/删除：实际访问一次才能发现 */
+    return permCheck.then(probeDirAccess);
+  }
+  function probeDirAccess() {
+    var h = state.dirHandle;
+    if (!h) return Promise.reject(new Error('尚未授权 book 文件夹'));
+    if (typeof h.values !== 'function') return Promise.resolve(true);
+    try {
+      return Promise.resolve(h.values().next()).then(function () { return true; });
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+  function isDirBroken(err) {
+    var n = (err && err.name) || '';
+    return n === 'NotFoundError' || n === 'NotAllowedError' ||
+      /could not be found/i.test((err && err.message) || '');
+  }
+  function fsErrorText(err, stage) {
+    var name = (err && err.name) || '';
+    var msg = (err && err.message) || String(err);
+    var out = '写入失败' + (stage ? '（步骤：' + stage + '）' : '') + (name ? ' [' + name + ']' : '') + '：' + msg;
+    var dir = state.bookDirName || '（未选择）';
+    if (isDirBroken(err)) {
+      out += ' 处理建议：book 文件夹「' + dir + '」可能已被移动、重命名或删除，或目标文件正被其他程序占用。' +
+        '请点「选择 / 更换 book 文件夹」重新授权；若同名文件已在其他程序中打开，请先关闭再上传。';
+    } else if (name === 'QuotaExceededError') {
+      out += ' 处理建议：磁盘空间不足，请清理后重试。';
+    }
+    return out;
+  }
   function uploadOne(file) {
     var item = {
       id: 'u' + (++state.uploadSeq),
@@ -2500,6 +2550,7 @@ button { cursor: pointer; }
       return Promise.resolve(item);
     }
 
+    var stage = '读取文件内容';
     return readFileWithProgress(file, item).then(function (buffer) {
       if (item.ctrl.canceled) {
         item.status = 'canceled';
@@ -2517,9 +2568,14 @@ button { cursor: pointer; }
       }
       item.status = 'writing';
       renderUploads();
-      return state.dirHandle.getFileHandle(file.name, { create: true })
-        .then(function (fh) { return fh.createWritable(); })
-        .then(function (writable) {
+      stage = '检查文件夹写入权限';
+      return ensureDirWritable().then(function () {
+        stage = '创建文件句柄';
+        return state.dirHandle.getFileHandle(file.name, { create: true });
+      }).then(function (fh) {
+        stage = '创建写入器';
+        return fh.createWritable();
+      }).then(function (writable) {
           return writable.write(buffer).then(function () {
             if (item.ctrl.canceled) {
               /* 取消后同步删除已写入的内容 */
@@ -2530,6 +2586,7 @@ button { cursor: pointer; }
                 item.error = '已取消：已删除写入的内容';
               });
             }
+            stage = '完成写入';
             return writable.close().then(function () {
               item.status = 'done';
               var bk = null;
@@ -2553,7 +2610,9 @@ button { cursor: pointer; }
         item.error = '已取消（未写入任何内容）';
       } else {
         item.status = 'error';
-        item.error = '写入失败：' + (err && err.message ? err.message : err);
+        item.error = fsErrorText(err, stage);
+        /* 目录已失效：把状态改回未授权，让界面明确提示重新选择文件夹 */
+        if (isDirBroken(err)) state.dirReady = false;
       }
     }).then(function () {
       renderAll();

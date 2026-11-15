@@ -3,9 +3,9 @@
 const fs = require('fs');
 const vm = require('vm');
 
-const CANDIDATES = ['D:/Zapp/index.html', 'D:/Zapp/1.2版本.html', 'D:/Zapp/1.1版本.html'];
+const CANDIDATES = ['D:/Zapp/当前版本/index.html', 'D:/Zapp/index.html'];
 const HTML_PATH = CANDIDATES.filter((p) => fs.existsSync(p))[0];
-if (!HTML_PATH) { console.error('未找到被测文件'); process.exit(1); }
+if (!HTML_PATH) { console.error('未找到被测文件（当前版本/index.html）'); process.exit(1); }
 console.log('被测文件: ' + HTML_PATH);
 const html = fs.readFileSync(HTML_PATH, 'utf8');
 const baseSrc = html.match(/<script>([\s\S]*?)<\/script>/)[1];
@@ -149,18 +149,26 @@ function makeContext(store, opts) {
       }
     };
   }
-  function fakeDirHandle() {
+  function dirMissingError() {
+    const e = new Error('A requested file or directory could not be found at the time an operation was processed.');
+    e.name = 'NotFoundError';
+    return e;
+  }
+  function fakeDirHandle(fail) {
+    fail = fail || {};
     return {
       kind: 'directory',
       name: 'book',
       queryPermission: () => Promise.resolve('granted'),
       requestPermission: () => Promise.resolve('granted'),
       getFileHandle(name, o) {
+        if (fail.getFileHandle) return Promise.reject(dirMissingError());
         if (!disk[name] && !(o && o.create)) return Promise.reject(new Error('NotFound'));
         if (!disk[name]) disk[name] = makeFakeFile(name, '');
         return Promise.resolve({
           getFile: () => Promise.resolve(disk[name]),
           createWritable: () => {
+            if (fail.createWritable) return Promise.reject(dirMissingError());
             let buf = null;
             return Promise.resolve({
               write(b) { buf = b; fileSystemLog.push('write:' + name); return Promise.resolve(); },
@@ -176,6 +184,7 @@ function makeContext(store, opts) {
       },
       removeEntry(name) { delete disk[name]; fileSystemLog.push('remove:' + name); return Promise.resolve(); },
       values() {
+        if (fail.values) return { next: () => Promise.reject(dirMissingError()) };
         const names = Object.keys(disk);
         let i = 0;
         return {
@@ -239,7 +248,7 @@ function makeContext(store, opts) {
     },
     showDirectoryPicker: opts.noFsPicker ? undefined : () => {
       if (opts.pickerAbort) return Promise.reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
-      return Promise.resolve(fakeDirHandle());
+      return Promise.resolve(fakeDirHandle(opts.dirFail));
     },
     showOpenFilePicker: opts.noFsPicker ? undefined : () => Promise.resolve(
       (opts.pickFiles || []).map((f) => ({ getFile: () => Promise.resolve(disk[f]) }))
@@ -346,7 +355,7 @@ const summaryText = (T) => {
 
   console.log('== 1. 版本与结构（1.3 需求） ==');
   ok('应用名为 Z', /<div class="sb-brand">Z</.test(html));
-  ok('版本号 1.3.0', T.APP_VERSION === '1.3.0', T.APP_VERSION);
+  ok('版本号 1.4.0', T.APP_VERSION === '1.4.0', T.APP_VERSION);
   ok('左侧边栏已恢复且无日历入口', /class="sidebar"/.test(html) && /id="nav-todo"/.test(html) && !/nav-calendar|page-calendar/.test(html));
   ok('侧边栏含 书架 / 抽卡', /id="nav-shelf"/.test(html) && /id="nav-gacha"/.test(html));
   ok('侧边栏左下含设置入口', /id="nav-settings"/.test(html) && /sb-foot/.test(html));
@@ -551,6 +560,31 @@ const summaryText = (T) => {
   ok('可取消上传', canceled && canceled.status === 'canceled', canceled && canceled.status);
   ok('取消后有明确说明', canceled && /取消/.test(canceled.error || ''), canceled && canceled.error);
   ok('取消后已写入内容被删除', !T.disk['取消我.txt'], Object.keys(T.disk));
+
+  console.log('== 10b. 目录失效 / 写入失败的错误诊断 ==');
+  const brokenDir = makeContext({}, { dirFail: { values: true } });
+  brokenDir.byId['nav-shelf'].click();
+  await brokenDir.pickBookFolder();
+  await settle();
+  brokenDir.state.dirReady = true;   // 模拟「权限仍为 granted，但目录已被移走」
+  const rBroken = await brokenDir.uploadOne(brokenDir.makeFakeFile('目录失效.txt', '内容'));
+  await settle();
+  ok('目录失效时上传失败', rBroken.status === 'error', rBroken.status);
+  ok('错误信息标明失败步骤', /步骤：检查文件夹写入权限/.test(rBroken.error), rBroken.error);
+  ok('错误信息包含错误类型', /NotFoundError/.test(rBroken.error), rBroken.error);
+  ok('错误信息给出移动/删除与重新授权建议',
+    /移动|删除/.test(rBroken.error) && /重新授权/.test(rBroken.error), rBroken.error);
+  ok('失败后授权状态改回未授权', brokenDir.state.dirReady === false);
+  ok('目录失效时不会写入任何文件', !brokenDir.disk['目录失效.txt'], Object.keys(brokenDir.disk));
+
+  const writeFail = makeContext({}, { dirFail: { createWritable: true } });
+  await writeFail.pickBookFolder();
+  await settle();
+  const rWrite = await writeFail.uploadOne(writeFail.makeFakeFile('写失败.txt', '内容'));
+  await settle();
+  ok('创建写入器失败时上传失败', rWrite.status === 'error', rWrite.status);
+  ok('错误信息标明「创建写入器」步骤', /步骤：创建写入器/.test(rWrite.error), rWrite.error);
+  ok('写入失败时给出占用/重新授权提示', /占用|重新授权/.test(rWrite.error), rWrite.error);
 
   console.log('== 11. 书架：阅读进度 / 上次时间 / 删除 ==');
   const book = T.state.books.filter((b) => b.name === '新书.txt')[0];
