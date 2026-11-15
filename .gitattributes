@@ -1,0 +1,11 @@
+# 统一按文本处理，避免跨平台换行差异污染 diff
+* text=auto
+
+*.html text
+*.js   text
+*.md   text
+*.txt  text
+*.json text
+
+# Windows 批处理必须保留 CRLF
+*.bat  text eol=crlf

@@ -1,0 +1,3113 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Z · 待办与书架</title>
+<style>
+/* ============ 基础与主题变量 ============ */
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --text: #1d1f23;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --accent: #2f6feb;
+  --accent-soft: #e8f0fe;
+  --danger: #d64545;
+  --ok: #2f9e6b;
+  --chip: #f2f3f5;
+  --sidebar: #ffffff;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 8px 24px rgba(16, 24, 40, .08);
+  --radius: 10px;
+}
+html[data-theme="dark"] {
+  --bg: #17181c;
+  --panel: #202228;
+  --text: #e8eaee;
+  --muted: #9aa1ad;
+  --line: #32353d;
+  --accent: #6f9dff;
+  --accent-soft: #26324a;
+  --danger: #ef6b6b;
+  --ok: #4cc38a;
+  --chip: #2a2d34;
+  --sidebar: #1c1e23;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", Roboto, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* ============ 布局：侧边栏 + 主区域 ============ */
+.app { display: flex; min-height: 100vh; align-items: stretch; }
+.sidebar {
+  width: 218px; flex: 0 0 218px;
+  background: var(--sidebar); border-right: 1px solid var(--line);
+  padding: 14px 12px; display: flex; flex-direction: column; gap: 6px;
+  position: sticky; top: 0; height: 100vh; overflow: auto;
+}
+.sb-brand { font-size: 26px; font-weight: 800; letter-spacing: 1px; line-height: 1.1; padding: 2px 8px 4px; }
+.sb-brand small { display: block; font-size: 11.5px; font-weight: 400; letter-spacing: 0; color: var(--muted); margin-top: 5px; }
+.sb-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.sb-item {
+  display: flex; align-items: center; gap: 8px; text-align: left;
+  border: 1px solid transparent; background: transparent; border-radius: 8px;
+  padding: 8px 10px; color: var(--text);
+}
+.sb-item:hover { background: var(--chip); }
+.sb-item.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sb-item .sb-badge {
+  margin-left: auto; font-size: 11.5px; line-height: 17px; min-width: 20px; text-align: center;
+  border-radius: 999px; background: var(--chip); color: var(--muted); padding: 0 6px;
+}
+.sb-item.on .sb-badge { background: var(--panel); color: var(--accent); }
+.sb-foot { margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+.sb-foot .btn { text-align: left; }
+.sb-foot .btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.sb-tip { font-size: 11.5px; color: var(--muted); padding: 4px 8px 0; line-height: 1.5; }
+
+.main { flex: 1 1 auto; min-width: 0; padding: 14px 18px 24px; }
+.main-inner { max-width: 1180px; margin: 0 auto; }
+.page-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 2px 2px 14px; }
+.page-head h1 { font-size: 20px; margin: 0; font-weight: 700; }
+.page-head .sub { color: var(--muted); font-size: 13px; }
+.page-head .spacer { margin-left: auto; }
+.page[hidden] { display: none; }
+
+/* ============ 提示条 / 面板 ============ */
+.notice {
+  border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  background: var(--panel); border-radius: var(--radius);
+  padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: var(--muted);
+}
+.notice b { color: var(--text); font-weight: 600; }
+.notice ul { margin: 6px 0 0; padding-left: 20px; }
+.notice li { margin: 2px 0; }
+.layout { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.panel-calendar { flex: 1 1 400px; min-width: 320px; padding: 14px; }
+.panel-todos { flex: 1 1 420px; min-width: 320px; padding: 14px 14px 30px; }
+.wide { width: 100%; padding: 14px; }
+.panel-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.panel-head h2 { font-size: 15px; margin: 0; font-weight: 600; }
+.panel-head .spacer { margin-left: auto; }
+.subline { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+.bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.count-pill {
+  border: 1px solid var(--accent); color: var(--accent); background: var(--accent-soft);
+  border-radius: 999px; padding: 2px 10px; font-size: 12.5px;
+}
+.count-pill.warn { border-color: var(--danger); color: var(--danger); background: transparent; }
+.kv { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+
+/* ============ 按钮 ============ */
+.btn {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
+  padding: 7px 12px; transition: background .12s ease;
+}
+.btn:hover { background: var(--chip); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent); filter: brightness(1.06); }
+.btn-ghost { background: transparent; }
+.btn-danger { color: var(--danger); }
+.btn-danger:hover { background: var(--chip); }
+.btn-sm { padding: 4px 9px; font-size: 13px; }
+.btn-icon {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
+  width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+}
+.btn-icon:hover { background: var(--chip); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+.btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* ============ tooltip（hover 提示） ============ */
+.tip { position: relative; }
+.tip[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; right: 0; bottom: calc(100% + 8px);
+  background: #22252c; color: #fff; font-size: 12px; line-height: 1.4;
+  padding: 5px 9px; border-radius: 6px; white-space: nowrap;
+  box-shadow: var(--shadow); z-index: 90; pointer-events: none;
+}
+.tip[data-tip]:hover::before {
+  content: ''; position: absolute; right: 14px; bottom: calc(100% + 3px);
+  border: 5px solid transparent; border-top-color: #22252c; z-index: 90; pointer-events: none;
+}
+
+/* ============ 日历 ============ */
+.cal-head { display: flex; align-items: center; gap: 10px; margin: 12px 0 10px; }
+.cal-title { font-size: 16px; font-weight: 600; min-width: 128px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-dow { text-align: center; font-size: 12px; color: var(--muted); padding: 4px 0; }
+.cal-cell {
+  position: relative; aspect-ratio: 1 / 1; min-height: 40px;
+  border: 1px solid transparent; border-radius: 8px; background: transparent;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 2px;
+  transition: background .12s ease;
+}
+.cal-cell:hover { background: var(--chip); }
+.cal-cell.out { color: var(--muted); opacity: .55; }
+.cal-cell.today { border-color: var(--accent); }
+.cal-cell.sel { background: var(--accent-soft); border-color: var(--accent); }
+.cal-cell .dnum { font-size: 13px; line-height: 1; font-variant-numeric: tabular-nums; }
+.cal-dots { display: flex; gap: 3px; height: 5px; align-items: center; }
+.dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); display: inline-block; }
+.dot.done { background: var(--ok); }
+.dot.rest { background: var(--line); }
+.cal-legend { display: flex; gap: 14px; color: var(--muted); font-size: 12px; margin-top: 10px; flex-wrap: wrap; }
+
+/* ============ 待办列表 ============ */
+.todo-list { list-style: none; margin: 12px 0 0; padding: 0; }
+.todo {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; background: var(--panel);
+}
+.todo:hover { background: var(--chip); }
+.todo-check { margin-top: 2px; width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--accent); }
+.todo-body { flex: 1 1 auto; min-width: 0; }
+.todo-title { font-size: 14px; word-break: break-word; }
+.todo.done .todo-title { text-decoration: line-through; color: var(--muted); }
+.todo-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.todo-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.badge {
+  border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; font-size: 11.5px; line-height: 18px;
+  background: var(--chip); color: var(--muted);
+}
+.badge.due-today { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.badge.overdue { color: var(--danger); border-color: var(--danger); background: transparent; }
+.badge.done { color: var(--ok); border-color: var(--ok); background: transparent; }
+.badge.p1 { color: var(--danger); border-color: var(--danger); background: transparent; }
+.badge.warn { color: var(--danger); border-color: var(--danger); background: transparent; }
+.todo-input {
+  width: 100%; margin-top: 6px; border: 1px solid var(--line); border-radius: 6px;
+  padding: 5px 8px; background: var(--panel); font-size: 13px;
+}
+.empty { color: var(--muted); font-size: 13px; padding: 26px 8px; text-align: center; }
+
+/* ============ 悬浮组件（滚动跟随 + 页脚避让） ============ */
+.float-stack { position: fixed; right: 18px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.trash-float {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
+  padding: 8px 14px; box-shadow: var(--shadow);
+}
+.trash-float:hover { background: var(--chip); }
+.trash-float .badge { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+#btn-undo { border-radius: 999px; box-shadow: var(--shadow); }
+#btn-undo[disabled] { opacity: .45; }
+#btn-undo .badge { margin-left: 6px; }
+.trash-panel {
+  position: fixed; right: 18px; z-index: 45;
+  width: min(460px, calc(100vw - 36px)); max-height: 70vh;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden;
+}
+.trash-panel .tp-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.trash-panel .tp-head h3 { font-size: 14px; margin: 0; font-weight: 600; }
+.trash-panel .tp-head .spacer { margin-left: auto; }
+.trash-panel .tp-body { padding: 10px 12px; overflow: auto; }
+.trash-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; }
+.trash-body { flex: 1 1 auto; min-width: 0; }
+.trash-title { font-size: 14px; text-decoration: line-through; color: var(--muted); word-break: break-word; }
+
+/* ============ 批量创建 ============ */
+.batch-dates { border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.pick-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.pick-cell {
+  border: 1px solid transparent; border-radius: 6px; background: transparent;
+  min-height: 30px; padding: 2px; font-size: 12.5px; font-variant-numeric: tabular-nums;
+}
+.pick-cell:hover { background: var(--chip); }
+.pick-cell.out { color: var(--muted); opacity: .5; }
+.pick-cell.sel { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pick-cells { display: flex; flex-wrap: wrap; gap: 6px; max-height: 120px; overflow: auto; }
+.pick-chip {
+  border: 1px solid var(--line); border-radius: 999px; background: var(--chip);
+  padding: 2px 6px 2px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;
+}
+.pick-chip button { border: none; background: transparent; color: var(--muted); padding: 0 2px; line-height: 1; font-size: 13px; }
+.pick-chip button:hover { color: var(--danger); }
+.batch-summary { border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: 8px; padding: 10px 12px; margin-top: 12px; font-size: 13px; }
+.batch-summary.has-fail { border-left-color: var(--danger); }
+.batch-summary ul { margin: 6px 0 0; padding-left: 20px; }
+.batch-summary .fail li { color: var(--danger); }
+.batch-summary .t { font-weight: 600; }
+
+/* ============ 弹窗 ============ */
+.overlay {
+  position: fixed; inset: 0; z-index: 60; background: rgba(17, 20, 26, .42);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.modal {
+  width: 100%; max-width: 480px; background: var(--panel); color: var(--text);
+  border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--shadow); padding: 18px; max-height: 90vh; overflow: auto;
+}
+.modal.wide { max-width: 580px; }
+.modal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.modal-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.modal-text { font-size: 13.5px; color: var(--muted); white-space: pre-line; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 16px; }
+.modal-actions.stack { justify-content: stretch; }
+.modal-actions.stack .btn { flex: 1 1 100%; text-align: center; }
+.modal-actions.between { justify-content: space-between; }
+
+.reminder-list { display: flex; flex-direction: column; gap: 10px; }
+.reminder-item { border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--chip); }
+.reminder-item.postponed { border-color: var(--accent); }
+.reminder-item .t { font-size: 14px; color: var(--text); }
+.reminder-item .m { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.reminder-item .ops { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.reminder-foot { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+.form { display: grid; grid-template-columns: 84px 1fr; gap: 10px 12px; align-items: center; }
+.form label { color: var(--muted); font-size: 13px; }
+.form input[type="text"], .form input[type="date"], .form input[type="time"], .form select, .form textarea {
+  width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; background: var(--panel);
+}
+.form textarea { min-height: 58px; resize: vertical; }
+.form .full { grid-column: 1 / -1; }
+.form-legend { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; margin-top: 2px; }
+.chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.field-error { color: var(--danger); font-size: 12px; min-height: 16px; }
+.item-ops { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ============ 书架 ============ */
+.shelf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 14px; }
+.book-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--panel); display: flex; flex-direction: column; gap: 8px; }
+.book-card.missing { border-style: dashed; }
+.book-title { font-size: 15px; font-weight: 600; word-break: break-word; }
+.book-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.progress { height: 6px; border-radius: 999px; background: var(--chip); overflow: hidden; }
+.progress > i { display: block; height: 100%; background: var(--accent); }
+.book-ops { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+
+/* 上传面板（可最小化 / 可取消） */
+.upload-panel {
+  position: fixed; right: 18px; bottom: 18px; z-index: 70; width: min(380px, calc(100vw - 36px));
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.upload-panel .up-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.upload-panel .up-head .spacer { margin-left: auto; }
+.upload-panel .up-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.upload-panel.min { width: auto; }
+.upload-panel.min .up-body { display: none; }
+.upload-panel.min .up-head { border-bottom: none; }
+.upload-panel.min .up-detail { display: none; }
+.upload-item { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.upload-item .row { display: flex; gap: 8px; align-items: center; }
+.upload-item .row .name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 阅读器 */
+.reader-overlay { position: fixed; inset: 0; z-index: 75; background: var(--bg); display: flex; flex-direction: column; }
+.reader-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.reader-head h2 { font-size: 15px; margin: 0; font-weight: 600; }
+.reader-head .spacer { margin-left: auto; }
+.reader-body { flex: 1 1 auto; overflow: auto; padding: 18px 16px 40px; }
+.reader-text {
+  max-width: 820px; margin: 0 auto; white-space: pre-wrap; word-break: break-word;
+  font-size: 16px; line-height: 1.9; font-family: Georgia, "Songti SC", "SimSun", "Microsoft YaHei", serif;
+}
+.reader-foot { border-top: 1px solid var(--line); background: var(--panel); padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.reader-foot input[type="range"] { flex: 1 1 200px; accent-color: var(--accent); }
+
+/* ============ 设置 ============ */
+.set-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 2px; border-bottom: 1px solid var(--line); }
+.set-row:last-child { border-bottom: none; }
+.set-row .label { min-width: 150px; font-weight: 600; }
+.set-row .desc { color: var(--muted); font-size: 12.5px; flex: 1 1 240px; }
+.switch {
+  position: relative; width: 44px; height: 24px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--chip); flex: 0 0 auto; padding: 0;
+}
+.switch > i { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--muted); transition: left .12s ease; }
+.switch.on { background: var(--accent-soft); border-color: var(--accent); }
+.switch.on > i { left: 22px; background: var(--accent); }
+
+/* ============ 轻提示 ============ */
+#toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 90;
+  display: flex; gap: 10px; align-items: center;
+  background: #22252c; color: #fff; border-radius: 8px; padding: 9px 12px;
+  font-size: 13px; box-shadow: var(--shadow); max-width: calc(100vw - 36px);
+}
+#toast button { background: transparent; border: 1px solid rgba(255,255,255,.4); color: #fff; border-radius: 6px; padding: 3px 8px; font-size: 12.5px; }
+
+/* ============ 页脚（悬浮组件避让参照） ============ */
+.app-footer {
+  margin-top: 28px; padding: 16px 2px 8px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 12.5px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+}
+.app-footer .spacer { margin-left: auto; }
+
+/* ============ 窄屏 ============ */
+@media (max-width: 860px) {
+  .app { flex-direction: column; }
+  .sidebar { width: auto; flex: 0 0 auto; height: auto; position: static; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; }
+  .sb-brand { font-size: 20px; padding: 0 6px; }
+  .sb-brand small { display: none; }
+  .sb-nav { flex-direction: row; flex-wrap: wrap; margin-top: 0; }
+  .sb-foot { margin: 0; flex-direction: row; border-top: none; padding-top: 0; flex-wrap: wrap; }
+  .sb-tip { display: none; }
+  .float-stack, .trash-panel { right: 10px; }
+  .form { grid-template-columns: 76px 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ================= 左侧边栏 ================= -->
+  <aside class="sidebar">
+    <div class="sb-brand">Z<small>待办 · 书架 · 数据留在本机</small></div>
+
+    <nav class="sb-nav">
+      <button class="sb-item on" id="nav-todo" type="button">待办<span class="sb-badge" id="nav-todo-badge">0</span></button>
+      <button class="sb-item" id="nav-shelf" type="button">书架<span class="sb-badge" id="nav-shelf-badge">0</span></button>
+      <button class="sb-item" id="nav-gacha" type="button">抽卡</button>
+    </nav>
+
+    <div class="sb-foot">
+      <button class="btn" id="nav-settings" type="button">设置</button>
+      <button class="btn btn-sm" id="btn-export" type="button">导出 JSON 备份</button>
+      <button class="btn btn-sm" id="btn-import" type="button">导入 JSON 备份</button>
+      <button class="btn btn-sm btn-ghost" id="btn-help" type="button">帮助 / 说明</button>
+      <div class="sb-tip">图书存放在你选择的本地 book 文件夹，<b>不计入待办备份</b>。</div>
+    </div>
+  </aside>
+
+  <!-- ================= 主区域 ================= -->
+  <main class="main" id="main">
+    <div class="main-inner">
+
+      <div class="notice">
+        <b>重要提示</b>
+        <ul>
+          <li>提醒<b>仅在页面打开时生效</b>（页面内弹窗 + 可选提示音），关闭窗口后不会再提醒，也不会使用系统通知。</li>
+          <li>待办与阅读进度保存在本机浏览器 localStorage，<b>清除浏览器缓存会丢失</b>（图书正文仍在你的本地文件夹里）。</li>
+          <li>书架依赖本地 HTTP 服务（如 <code>python -m http.server 8000 --bind 127.0.0.1</code> → <code>http://127.0.0.1:8000</code>），仅 Chrome / Edge 支持，不支持 file:// 双击打开。</li>
+        </ul>
+      </div>
+
+      <!-- ============ 待办 ============ -->
+      <section class="page" id="page-todo">
+        <div class="page-head">
+          <h1>待办</h1>
+          <span class="sub" id="todo-info">—</span>
+          <span class="spacer"></span>
+          <button class="btn btn-primary btn-sm" id="btn-batch" type="button">批量新建</button>
+          <button class="btn btn-sm" id="btn-new" type="button">新建待办</button>
+        </div>
+
+        <div class="layout">
+          <section class="panel panel-calendar">
+            <div class="panel-head">
+              <h2>日历</h2>
+              <span class="spacer"></span>
+              <button class="btn btn-sm" id="btn-today" type="button">回到今天</button>
+              <button class="btn btn-sm" id="btn-filter-all" type="button">全部待办</button>
+            </div>
+            <div class="cal-head">
+              <button class="btn-icon" id="cal-prev" type="button" aria-label="上个月">‹</button>
+              <div class="cal-title" id="cal-title">—</div>
+              <button class="btn-icon" id="cal-next" type="button" aria-label="下个月">›</button>
+            </div>
+            <div class="cal-grid" id="cal-grid"></div>
+            <div class="cal-legend">
+              <span><i class="dot"></i>有未完成待办</span>
+              <span><i class="dot done"></i>该日待办已全部完成</span>
+              <span><i class="dot rest"></i>该日待办较多</span>
+            </div>
+            <div class="subline" id="cal-info">点选某一天，可只看那天的待办；再点一次取消筛选。</div>
+          </section>
+
+          <section class="panel panel-todos" id="panel-todos">
+            <div class="panel-head">
+              <h2>待办列表</h2>
+              <span class="spacer"></span>
+              <button class="btn btn-sm" id="btn-filter-today" type="button">只看今天</button>
+              <button class="btn btn-sm" id="btn-clear-done" type="button">清除已完成</button>
+            </div>
+            <ul class="todo-list" id="todo-list"></ul>
+            <div class="empty" id="todo-empty" hidden>暂无待办，点「新建待办」开始记录。</div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ 书架 ============ -->
+      <section class="page" id="page-shelf" hidden>
+        <div class="page-head">
+          <h1>书架</h1>
+          <span class="sub" id="shelf-info">—</span>
+          <span class="spacer"></span>
+          <button class="btn btn-sm" id="btn-shelf-pick" type="button">选择 / 更换 book 文件夹</button>
+          <button class="btn btn-primary btn-sm" id="btn-shelf-upload" type="button">上传 txt</button>
+        </div>
+        <div class="panel wide">
+          <div class="notice" id="shelf-support" style="margin:0 0 12px" hidden></div>
+          <div class="kv" id="shelf-stat">—</div>
+          <div id="shelf-path" style="color:var(--muted);font-size:12.5px;margin-top:6px">尚未选择 book 文件夹</div>
+          <div class="shelf-grid" id="shelf-grid"></div>
+          <div class="empty" id="shelf-empty" hidden>书架还是空的：先选择本地 book 文件夹，再上传 txt 文档。</div>
+        </div>
+      </section>
+
+      <!-- ============ 抽卡（占位） ============ -->
+      <section class="page" id="page-gacha" hidden>
+        <div class="page-head"><h1>抽卡</h1><span class="sub">占位页</span></div>
+        <div class="panel wide">
+          <div class="empty" style="padding:64px 12px">
+            <div style="font-size:22px;font-weight:700;color:var(--text);margin-bottom:8px">功能开发中</div>
+            <div>抽卡功能尚未实现，本版仅保留入口。</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 设置 ============ -->
+      <section class="page" id="page-settings" hidden>
+        <div class="page-head"><h1>设置</h1><span class="sub">外观与提示音</span></div>
+        <div class="panel wide">
+          <div class="set-row">
+            <span class="label">主题</span>
+            <span class="desc">浅色 / 深色，切换后立即生效并记住。</span>
+            <button class="btn btn-sm" id="set-theme" type="button">切换为深色</button>
+          </div>
+          <div class="set-row">
+            <span class="label">提示音总开关</span>
+            <span class="desc">关闭后所有提示音都不再播放。</span>
+            <button class="switch on" id="sw-sound" type="button" aria-label="提示音总开关"><i></i></button>
+          </div>
+          <div class="set-row">
+            <span class="label">到期提醒音</span>
+            <span class="desc">待办到期、页面内弹窗出现时播放。</span>
+            <button class="switch on" id="sw-sound-reminder" type="button" aria-label="到期提醒音"><i></i></button>
+          </div>
+          <div class="set-row">
+            <span class="label">上传完成提示音</span>
+            <span class="desc">书架上传播完成或失败时播放。</span>
+            <button class="switch on" id="sw-sound-upload" type="button" aria-label="上传完成提示音"><i></i></button>
+          </div>
+          <div class="set-row">
+            <span class="label">操作提示音</span>
+            <span class="desc">删除、恢复、清空等操作完成时播放。</span>
+            <button class="switch" id="sw-sound-action" type="button" aria-label="操作提示音"><i></i></button>
+          </div>
+          <div class="set-row">
+            <span class="label">书架存储</span>
+            <span class="desc" id="set-shelf-usage">—</span>
+            <button class="btn btn-sm" id="set-shelf-pick" type="button">选择 book 文件夹</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <footer class="app-footer" id="app-footer">
+      <span>Z · 版本 1.3.0 · 无账号、无云同步、无联网上传</span>
+      <span class="spacer"></span>
+      <span>数据仅存本机；请定期导出 JSON 备份</span>
+    </footer>
+  </main>
+</div>
+
+<!-- 悬浮：右下撤销（仅待办页，无历史时置灰不隐藏） -->
+<div class="float-stack" id="float-stack" hidden>
+  <button class="btn btn-sm tip" id="btn-undo" type="button" disabled
+    data-tip="撤销最近一步：删除 / 完成 / 新建 / 清除已完成 / 导入">↶ 撤销<span class="badge" id="undo-count">0</span></button>
+</div>
+
+<!-- 悬浮：右上回收站（仅待办页，滚动跟随 + 页脚避让） -->
+<div class="float-stack" id="trash-stack" hidden>
+  <button class="trash-float tip" id="btn-trash-float" type="button" data-tip="回收站：删除的待办保留 72 小时">
+    🗑 回收站<span class="badge" id="trash-float-count">0</span>
+  </button>
+</div>
+
+<!-- 回收站面板 -->
+<div class="trash-panel" id="trash-panel" hidden>
+  <div class="tp-head">
+    <h3>回收站</h3>
+    <span class="badge" id="trash-count">0</span>
+    <span class="spacer"></span>
+    <button class="btn btn-sm" id="btn-purge-expired" type="button">清理过期</button>
+    <button class="btn btn-sm btn-danger" id="btn-empty-trash" type="button">清空</button>
+    <button class="btn btn-sm btn-ghost" id="btn-trash-close" type="button">关闭</button>
+  </div>
+  <div class="tp-body">
+    <div class="subline" id="trash-info">—</div>
+    <div id="trash-list" style="margin-top:8px"></div>
+    <div class="empty" id="trash-empty" hidden>回收站是空的。</div>
+  </div>
+</div>
+
+<!-- 上传进度面板（可最小化 / 可取消） -->
+<div class="upload-panel" id="upload-panel" hidden>
+  <div class="up-head">
+    <span>上传图书</span>
+    <span class="up-detail" id="upload-summary"></span>
+    <span class="spacer"></span>
+    <button class="btn btn-sm btn-ghost" id="btn-upload-min" type="button">最小化</button>
+    <button class="btn btn-sm btn-danger" id="btn-upload-cancel" type="button">取消</button>
+  </div>
+  <div class="up-body" id="upload-list"></div>
+</div>
+
+<!-- 阅读器 -->
+<div class="reader-overlay" id="reader" hidden>
+  <div class="reader-head">
+    <h2 id="reader-title">—</h2>
+    <span class="badge" id="reader-encoding"></span>
+    <span class="spacer"></span>
+    <button class="btn btn-sm" id="btn-reader-prev" type="button">上一页</button>
+    <button class="btn btn-sm" id="btn-reader-next" type="button">下一页</button>
+    <button class="btn btn-sm" id="btn-reader-toc" type="button">回到开头</button>
+    <button class="btn btn-sm" id="btn-reader-close" type="button">关闭</button>
+  </div>
+  <div class="reader-body" id="reader-body">
+    <div class="reader-text" id="reader-text">（正在载入…）</div>
+  </div>
+  <div class="reader-foot">
+    <span id="reader-page">第 — / — 页</span>
+    <input type="range" id="reader-range" min="1" max="1" value="1" />
+    <span id="reader-percent">0%</span>
+  </div>
+</div>
+
+<!-- 页面内弹窗（唯一的提醒方式，不使用系统通知） -->
+<div class="overlay" id="overlay" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"></div>
+</div>
+
+<div id="toast" hidden><span id="toast-msg"></span><button type="button" id="toast-btn" hidden></button></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =========================================================
+   * 1. 常量与存储层（仅 localStorage + JSON.stringify/parse）
+   * =======================================================*/
+  var STORAGE = {
+    todos: 'zapp.todos.v1',
+    dismissed: 'zapp.remindersDismissed.v1',
+    snapshot: 'zapp.reminderSnapshot.v1',
+    theme: 'zapp.theme.v1',
+    sound: 'zapp.sound.v2',
+    pick: 'zapp.multiPick.v1',
+    books: 'zapp.books.v1',
+    dirName: 'zapp.bookDirName.v1'
+  };
+  var APP_NAME = 'Z';
+  var APP_VERSION = '1.3.0';
+  var TRASH_TTL_MS = 72 * 60 * 60 * 1000;
+  var SNOOZE_MS = 10 * 60 * 1000;
+  var UNDO_LIMIT = 20;
+  var BATCH_MAX = 50;
+  var BOOK_MAX_BYTES = 50 * 1024 * 1024;
+  var SHELF_MAX_BYTES = 10 * 1024 * 1024 * 1024;
+  var READ_PAGE_BYTES = 128 * 1024;
+  var SAMPLE_BYTES = 2 * 1024 * 1024;
+  var IDB_NAME = 'zapp-shelf';
+  var IDB_STORE = 'handles';
+  var IDB_KEY = 'bookDir';
+
+  function lsGet(key, fallback) {
+    try {
+      var raw = window.localStorage.getItem(key);
+      if (raw === null || raw === '' || raw === 'null') return fallback;
+      var v = JSON.parse(raw);
+      return v === null ? fallback : v;
+    } catch (e) {
+      return fallback;
+    }
+  }
+  function lsSet(key, value) {
+    try {
+      if (value === null || value === undefined) { window.localStorage.removeItem(key); return true; }
+      window.localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (e) {
+      alert('写入本地存储失败：' + (e && e.message ? e.message : e) +
+        '\n\n可能是浏览器隐私模式或存储空间已满。数据将无法保存，请先导出备份。');
+      return false;
+    }
+  }
+  function isPlainObject(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+  function defaultSounds() { return { master: true, reminder: true, upload: true, action: false }; }
+
+  /* =========================================================
+   * 2. 状态
+   * =======================================================*/
+  var state = {
+    todos: [],
+    dismissed: {},
+    snapshot: null,
+    viewYear: new Date().getFullYear(),
+    viewMonth: new Date().getMonth(),
+    selectedDate: null,
+    multiPick: [],
+    theme: 'light',
+    sounds: defaultSounds(),
+    lastReminderKey: '',
+    undoStack: [],
+    trashOpen: false,
+    route: 'todo',
+    books: [],
+    bookDirName: '',
+    dirHandle: null,
+    dirReady: false,
+    reader: null,
+    uploads: [],
+    uploadMin: false,
+    uploadSeq: 0
+  };
+
+  function nowIso() { return new Date().toISOString(); }
+  function uid() { return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function tsOf(iso) { var t = Date.parse(iso); return isNaN(t) ? null : t; }
+  function isDeleted(t) { return !!(t && t.deletedAt); }
+  function liveTodos() { return state.todos.filter(function (t) { return !isDeleted(t); }); }
+  function trashTodos() { return state.todos.filter(isDeleted); }
+  function byteText(n) {
+    if (!n) return '0 B';
+    var u = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n = n / 1024; i++; }
+    return (i === 0 ? n : n.toFixed(n < 10 ? 2 : 1)) + ' ' + u[i];
+  }
+
+  /* =========================================================
+   * 3. 日期工具
+   * =======================================================*/
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function toDateKey(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function todayKey() { return toDateKey(new Date()); }
+  function parseDateKey(key) {
+    var p = String(key || '').split('-');
+    if (p.length !== 3) return null;
+    var y = parseInt(p[0], 10), m = parseInt(p[1], 10), d = parseInt(p[2], 10);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+  }
+  function isValidDateKey(key) { var d = parseDateKey(key); return !!d && toDateKey(d) === key; }
+  function normalizeTime(t) {
+    if (!t) return '';
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(t).trim());
+    if (!m) return '';
+    var h = parseInt(m[1], 10), mi = parseInt(m[2], 10);
+    if (h > 23 || mi > 59) return '';
+    return pad2(h) + ':' + pad2(mi);
+  }
+  function shiftDateKey(key, days) {
+    var d = parseDateKey(key);
+    if (!d) return key;
+    d.setDate(d.getDate() + days);
+    return toDateKey(d);
+  }
+  function weekdayCn(d) { return '星期' + '日一二三四五六'.charAt(d.getDay()); }
+  function monthDates(y, m) {
+    var out = [], days = new Date(y, m + 1, 0).getDate();
+    for (var i = 1; i <= days; i++) out.push(y + '-' + pad2(m + 1) + '-' + pad2(i));
+    return out;
+  }
+  function uniqDates(list) {
+    var seen = {}, out = [];
+    (list || []).forEach(function (d) {
+      if (!isValidDateKey(d) || seen[d]) return;
+      seen[d] = true; out.push(d);
+    });
+    return out.sort();
+  }
+  function expandDateRange(a, b) {
+    if (!isValidDateKey(a) || !isValidDateKey(b)) return [];
+    var from = a <= b ? a : b, to = a <= b ? b : a;
+    var out = [], cur = from, guard = 0;
+    while (cur <= to && guard < 4000) { out.push(cur); cur = shiftDateKey(cur, 1); guard++; }
+    return out;
+  }
+  function dueTimestamp(todo) {
+    if (!todo || !todo.date) return null;
+    var d = parseDateKey(todo.date);
+    if (!d) return null;
+    var t = normalizeTime(todo.time);
+    if (t) {
+      var parts = t.split(':');
+      d.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+    } else {
+      d.setHours(23, 59, 59, 0);
+    }
+    return d.getTime();
+  }
+  function remindTimestamp(todo) {
+    var rt = tsOf(todo && todo.remindAt);
+    if (rt !== null) return rt;
+    return dueTimestamp(todo);
+  }
+  function humanDue(todo) {
+    if (!todo.date) return '未设日期';
+    var t = todayKey(), label = todo.date;
+    if (todo.date === t) label = '今天';
+    else if (todo.date === shiftDateKey(t, 1)) label = '明天';
+    else if (todo.date === shiftDateKey(t, -1)) label = '昨天';
+    else {
+      var d = parseDateKey(todo.date);
+      label = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + weekdayCn(d);
+      if (d.getFullYear() !== new Date().getFullYear()) label = d.getFullYear() + '年' + label;
+    }
+    return todo.time ? label + ' ' + todo.time : label;
+  }
+  function humanDateKey(key) {
+    var d = parseDateKey(key);
+    if (!d) return String(key);
+    var t = todayKey();
+    var suffix = key === t ? '（今天）' : (key === shiftDateKey(t, 1) ? '（明天）' : '');
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + weekdayCn(d) + suffix;
+  }
+  function formatStamp(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+  function humanAgo(iso) {
+    var t = tsOf(iso);
+    if (t === null) return '从未打开';
+    var mins = Math.floor((Date.now() - t) / 60000);
+    if (mins < 1) return '刚刚';
+    if (mins < 60) return mins + ' 分钟前';
+    var hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + ' 小时前';
+    var days = Math.floor(hours / 24);
+    if (days < 30) return days + ' 天前';
+    return formatStamp(iso);
+  }
+  function humanRemain(ms) {
+    if (ms <= 0) return '已过期，即将清除';
+    var mins = Math.floor(ms / 60000), hours = Math.floor(mins / 60), days = Math.floor(hours / 24);
+    if (days >= 1) return '剩余 ' + days + ' 天 ' + (hours % 24) + ' 小时';
+    if (hours >= 1) return '剩余 ' + hours + ' 小时 ' + (mins % 60) + ' 分钟';
+    return '剩余 ' + Math.max(mins, 1) + ' 分钟';
+  }
+  function humanFromNow(iso) {
+    var t = tsOf(iso);
+    if (t === null) return '';
+    var diff = t - Date.now(), mins = Math.round(Math.abs(diff) / 60000), txt;
+    if (mins < 60) txt = mins + ' 分钟';
+    else if (mins < 60 * 24) txt = Math.floor(mins / 60) + ' 小时';
+    else txt = Math.floor(mins / (60 * 24)) + ' 天';
+    return (diff >= 0 ? '还有 ' : '已过 ') + txt;
+  }
+
+  /* =========================================================
+   * 4. DOM 工具
+   * =======================================================*/
+  function $(id) { return document.getElementById(id); }
+  function h(tag, attrs, children) {
+    var el = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (k) {
+        var v = attrs[k];
+        if (v === null || v === undefined || v === false) return;
+        if (k === 'class') el.className = v;
+        else if (k === 'text') el.textContent = v;
+        else if (k === 'dataset') { Object.keys(v).forEach(function (dk) { el.dataset[dk] = v[dk]; }); }
+        else if (k.indexOf('on') === 0 && typeof v === 'function') el.addEventListener(k.slice(2), v);
+        else el.setAttribute(k, v === true ? '' : v);
+      });
+    }
+    if (children) {
+      (Array.isArray(children) ? children : [children]).forEach(function (c) {
+        if (c === null || c === undefined || c === false) return;
+        el.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c);
+      });
+    }
+    return el;
+  }
+  function clear(node) { if (node) node.textContent = ''; }
+  function setHidden(node, hidden) { if (node) node.hidden = !!hidden; }
+
+  /* =========================================================
+   * 5. 待办数据读写
+   * =======================================================*/
+  function normalizeTodo(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var title = String(raw.title === undefined || raw.title === null ? '' : raw.title).trim();
+    if (!title) return null;
+    var date = isValidDateKey(raw.date) ? String(raw.date) : '';
+    var deletedAt = typeof raw.deletedAt === 'string' && tsOf(raw.deletedAt) !== null ? raw.deletedAt : null;
+    var firstDeletedAt = typeof raw.firstDeletedAt === 'string' && tsOf(raw.firstDeletedAt) !== null ? raw.firstDeletedAt : deletedAt;
+    return {
+      id: typeof raw.id === 'string' && raw.id ? raw.id : uid(),
+      title: title.slice(0, 200),
+      note: String(raw.note || '').slice(0, 1000),
+      date: date,
+      time: date ? normalizeTime(raw.time) : '',
+      done: raw.done === true,
+      priority: raw.priority === 1 || raw.priority === '1' ? 1 : 0,
+      createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : nowIso(),
+      updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : nowIso(),
+      completedAt: typeof raw.completedAt === 'string' ? raw.completedAt : null,
+      deletedAt: deletedAt,
+      firstDeletedAt: firstDeletedAt,
+      remindAt: typeof raw.remindAt === 'string' && tsOf(raw.remindAt) !== null ? raw.remindAt : null
+    };
+  }
+  function getTodo(id) {
+    for (var i = 0; i < state.todos.length; i++) if (state.todos[i].id === id) return state.todos[i];
+    return null;
+  }
+  function saveTodos() { lsSet(STORAGE.todos, state.todos); }
+  function saveDismissed() { lsSet(STORAGE.dismissed, state.dismissed); }
+  function saveSnapshot() { lsSet(STORAGE.snapshot, state.snapshot); }
+  function makeSnapshot(list) { return { ids: list.map(function (t) { return t.id; }), at: nowIso() }; }
+
+  /* 书架元数据：只存本机，不进入待办备份 */
+  function shelfBooks() {
+    var raw = lsGet(STORAGE.books, []);
+    if (!Array.isArray(raw)) raw = [];
+    var out = [];
+    raw.forEach(function (b) {
+      if (!b || typeof b !== 'object') return;
+      var name = String(b.name || '').trim();
+      if (!name) return;
+      out.push({
+        id: typeof b.id === 'string' && b.id ? b.id : ('b' + Math.random().toString(36).slice(2, 9)),
+        name: name,
+        size: typeof b.size === 'number' && b.size >= 0 ? b.size : 0,
+        encoding: typeof b.encoding === 'string' ? b.encoding : '',
+        lastReadAt: typeof b.lastReadAt === 'string' ? b.lastReadAt : null,
+        pos: typeof b.pos === 'number' && b.pos >= 0 ? b.pos : 0,
+        percent: typeof b.percent === 'number' && b.percent >= 0 ? Math.min(b.percent, 100) : 0,
+        addedAt: typeof b.addedAt === 'string' ? b.addedAt : nowIso(),
+        missing: b.missing === true
+      });
+    });
+    return out;
+  }
+  function saveBooks() { lsSet(STORAGE.books, state.books); state.books = shelfBooks(); }
+  function shelfTotalBytes() { return state.books.reduce(function (s, b) { return s + (b.size || 0); }, 0); }
+  function getBook(id) {
+    for (var i = 0; i < state.books.length; i++) if (state.books[i].id === id) return state.books[i];
+    return null;
+  }
+
+  function loadAll() {
+    var rawTodos = lsGet(STORAGE.todos, []);
+    if (!Array.isArray(rawTodos)) rawTodos = [];
+    state.todos = rawTodos.map(normalizeTodo).filter(Boolean);
+
+    var dis = lsGet(STORAGE.dismissed, {});
+    state.dismissed = isPlainObject(dis) ? dis : {};
+
+    var snap = lsGet(STORAGE.snapshot, null);
+    state.snapshot = (isPlainObject(snap) && Array.isArray(snap.ids)) ? snap : null;
+
+    var pick = lsGet(STORAGE.pick, null);
+    if (isPlainObject(pick) && Array.isArray(pick.dates)) state.multiPick = uniqDates(pick.dates).slice(0, BATCH_MAX);
+
+    state.theme = lsGet(STORAGE.theme, 'light') === 'dark' ? 'dark' : 'light';
+    var snd = lsGet(STORAGE.sound, null);
+    state.sounds = (isPlainObject(snd) && typeof snd.master === 'boolean')
+      ? { master: snd.master !== false, reminder: snd.reminder !== false, upload: snd.upload !== false, action: snd.action === true }
+      : defaultSounds();
+
+    state.books = shelfBooks();
+    state.bookDirName = lsGet(STORAGE.dirName, '') || '';
+  }
+
+  /* =========================================================
+   * 6. 回收站
+   * =======================================================*/
+  function expiredTrash() {
+    var now = Date.now();
+    return trashTodos().filter(function (t) {
+      var t0 = tsOf(t.firstDeletedAt) || tsOf(t.deletedAt) || now;
+      return now - t0 >= TRASH_TTL_MS;
+    });
+  }
+  function purgeExpired(silent) {
+    var expired = expiredTrash();
+    if (!expired.length) return 0;
+    var ids = expired.map(function (t) { return t.id; });
+    state.todos = state.todos.filter(function (t) { return ids.indexOf(t.id) < 0; });
+    ids.forEach(function (id) { delete state.dismissed[id]; });
+    if (state.snapshot) state.snapshot.ids = state.snapshot.ids.filter(function (id) { return ids.indexOf(id) < 0; });
+    saveTodos(); saveDismissed(); saveSnapshot();
+    if (!silent) toast('已清除 ' + expired.length + ' 条过期条目（超过 72 小时）');
+    return expired.length;
+  }
+  function emptyTrash() {
+    var list = trashTodos();
+    if (!list.length) { toast('回收站已经是空的'); return; }
+    ask('清空回收站', '将立即彻底删除 ' + list.length + ' 条待办，删除后无法找回（可用撤销回退一次）。', [
+      { label: '取消', value: null, primary: false },
+      { label: '确认清空', value: 'ok', primary: true }
+    ]).then(function (r) {
+      if (r !== 'ok') return;
+      var removed = list.slice();
+      var ids = removed.map(function (t) { return t.id; });
+      state.todos = state.todos.filter(function (t) { return ids.indexOf(t.id) < 0; });
+      ids.forEach(function (id) { delete state.dismissed[id]; });
+      saveTodos(); saveDismissed();
+      pushUndo('清空回收站（' + removed.length + ' 条）', function () {
+        removed.forEach(function (t) { state.todos.push(t); });
+      });
+      renderAll();
+      playCue('action');
+      toast('已清空回收站：' + removed.length + ' 条');
+    });
+  }
+  function restoreFromTrash(id) {
+    var t = getTodo(id);
+    if (!t) return;
+    var before = { deletedAt: t.deletedAt, firstDeletedAt: t.firstDeletedAt };
+    t.deletedAt = null; t.firstDeletedAt = null; t.updatedAt = nowIso();
+    saveTodos();
+    pushUndo('恢复「' + t.title + '」', function () {
+      var x = getTodo(id);
+      if (x) { x.deletedAt = before.deletedAt; x.firstDeletedAt = before.firstDeletedAt; }
+    });
+    renderAll();
+    playCue('action');
+    toast('已恢复：' + t.title);
+  }
+  function purgeOne(id) {
+    var t = getTodo(id);
+    if (!t) return;
+    ask('彻底删除', '「' + t.title + '」将被立即永久删除，无法找回（可撤销一次）。', [
+      { label: '取消', value: null, primary: false },
+      { label: '确认删除', value: 'ok', primary: true }
+    ]).then(function (r) {
+      if (r !== 'ok') return;
+      state.todos.splice(state.todos.indexOf(t), 1);
+      delete state.dismissed[id];
+      if (state.snapshot) state.snapshot.ids = state.snapshot.ids.filter(function (x) { return x !== id; });
+      saveTodos(); saveDismissed(); saveSnapshot();
+      pushUndo('彻底删除「' + t.title + '」', function () { state.todos.push(t); });
+      renderAll();
+      playCue('action');
+      toast('已彻底删除：' + t.title);
+    });
+  }
+
+  /* =========================================================
+   * 7. 常驻撤销（仅待办页显示；无历史置灰不隐藏）
+   * =======================================================*/
+  function pushUndo(label, restore) {
+    state.undoStack.push({ label: label, restore: restore, at: nowIso() });
+    if (state.undoStack.length > UNDO_LIMIT) state.undoStack.shift();
+    renderUndo();
+  }
+  function doUndo() {
+    var item = state.undoStack.pop();
+    if (!item) { toast('没有可撤销的操作'); return; }
+    try { item.restore(); } catch (e) { toast('撤销失败：' + (e && e.message ? e.message : e)); }
+    saveTodos(); saveDismissed();
+    renderAll();
+    playCue('action');
+    toast('已撤销：' + item.label);
+  }
+  function renderUndo() {
+    var btn = $('btn-undo');
+    if (!btn) return;
+    var n = state.undoStack.length;
+    var badge = $('undo-count');
+    if (badge) badge.textContent = String(n);
+    btn.disabled = n === 0;   // 置灰 + 降透明度，但不隐藏
+    btn.title = n ? ('可撤销 ' + n + ' 步：' + state.undoStack[n - 1].label) : '暂无可撤销的操作';
+  }
+
+  /* =========================================================
+   * 8. 路由
+   * =======================================================*/
+  var ROUTES = ['todo', 'shelf', 'gacha', 'settings'];
+  var NAV_MAP = { 'nav-todo': 'todo', 'nav-shelf': 'shelf', 'nav-gacha': 'gacha', 'nav-settings': 'settings' };
+  function setRoute(route) {
+    if (ROUTES.indexOf(route) < 0) route = 'todo';
+    state.route = route;
+    ROUTES.forEach(function (r) { setHidden($('page-' + r), r !== route); });
+    Object.keys(NAV_MAP).forEach(function (id) {
+      var el = $(id);
+      if (!el) return;
+      if (NAV_MAP[id] === route) el.classList.add('on'); else el.classList.remove('on');
+    });
+    renderAll();
+    syncFloats();
+  }
+
+  /* =========================================================
+   * 9. 悬浮组件：仅待办页 + 滚动跟随 + 页脚避让
+   * =======================================================*/
+  var floatRaf = null;
+  function renderFloats() {
+    var on = state.route === 'todo';
+    setHidden($('float-stack'), !on);
+    setHidden($('trash-stack'), !on);
+    setHidden($('trash-panel'), !(on && state.trashOpen));
+  }
+  function syncFloats() {
+    var footer = $('app-footer');
+    var margin = 16;
+    var viewH = window.innerHeight || 800;
+    var limit = viewH - margin;
+    if (footer && typeof footer.getBoundingClientRect === 'function') {
+      var fr = footer.getBoundingClientRect();
+      if (fr.top < viewH) limit = Math.min(limit, fr.top - margin);
+    }
+    ['float-stack', 'trash-stack', 'trash-panel'].forEach(function (id) {
+      var el = $(id);
+      if (!el || el.hidden) return;
+      var height = el.offsetHeight || 44;
+      el.style.top = Math.round(Math.max(margin, limit - height)) + 'px';
+    });
+  }
+  function onScrollOrResize() {
+    if (floatRaf) return;
+    var raf = window.requestAnimationFrame || function (fn) { return setTimeout(fn, 16); };
+    floatRaf = raf(function () { floatRaf = null; syncFloats(); });
+  }
+
+  /* =========================================================
+   * 10. 多选日期（批量新建内部使用）
+   * =======================================================*/
+  function pickCount() { return state.multiPick.length; }
+  function isPicked(key) { return state.multiPick.indexOf(key) >= 0; }
+  function addPick(dates) {
+    var list = uniqDates(dates);
+    var added = 0, ok = true, reason = '';
+    for (var i = 0; i < list.length; i++) {
+      if (isPicked(list[i])) continue;
+      if (pickCount() >= BATCH_MAX) { ok = false; reason = '已达单次上限 ' + BATCH_MAX + ' 天'; break; }
+      state.multiPick.push(list[i]);
+      added++;
+    }
+    state.multiPick = uniqDates(state.multiPick);
+    savePickState();
+    return { added: added, ok: ok, reason: reason, total: list.length };
+  }
+  function removePick(key) { state.multiPick = state.multiPick.filter(function (d) { return d !== key; }); savePickState(); }
+  function clearPick() { state.multiPick = []; savePickState(); }
+  function savePickState() { lsSet(STORAGE.pick, { dates: state.multiPick }); }
+
+  /* =========================================================
+   * 11. 视图：日历 + 待办列表
+   * =======================================================*/
+  function todosByDate() {
+    var map = {};
+    liveTodos().forEach(function (t) {
+      if (!t.date) return;
+      (map[t.date] = map[t.date] || []).push(t);
+    });
+    return map;
+  }
+  function renderCalendar() {
+    var grid = $('cal-grid');
+    if (!grid) return;
+    clear(grid);
+    var y = state.viewYear, m = state.viewMonth;
+    $('cal-title').textContent = y + ' 年 ' + (m + 1) + ' 月';
+    ['一', '二', '三', '四', '五', '六', '日'].forEach(function (w) {
+      grid.appendChild(h('div', { class: 'cal-dow', text: w }));
+    });
+    var first = new Date(y, m, 1);
+    var off = (first.getDay() + 6) % 7;
+    var start = new Date(y, m, 1 - off);
+    var map = todosByDate();
+    var tk = todayKey();
+    for (var i = 0; i < 42; i++) {
+      (function (i) {
+        var d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+        var key = toDateKey(d);
+        var list = map[key] || [];
+        var open = list.filter(function (t) { return !t.done; }).length;
+        var doneCount = list.length - open;
+        var cls = 'cal-cell';
+        if (d.getMonth() !== m) cls += ' out';
+        if (key === tk) cls += ' today';
+        if (state.selectedDate === key) cls += ' sel';
+        var dots = [];
+        var shown = Math.min(open, 3);
+        for (var k = 0; k < shown; k++) dots.push(h('i', { class: 'dot' }));
+        if (open > 3) dots.push(h('i', { class: 'dot rest' }));
+        else if (open === 0 && doneCount > 0) dots.push(h('i', { class: 'dot done' }));
+        grid.appendChild(h('button', {
+          class: cls, type: 'button', 'data-date': key,
+          title: key + '（' + list.length + ' 条待办）',
+          'aria-label': key + ' 共 ' + list.length + ' 条待办',
+          onclick: function () {
+            state.selectedDate = (state.selectedDate === key) ? null : key;
+            renderAll();
+          }
+        }, [
+          h('span', { class: 'dnum', text: String(d.getDate()) }),
+          h('span', { class: 'cal-dots' }, dots)
+        ]));
+      })(i);
+    }
+  }
+  function sortTodos(list) {
+    return list.slice().sort(function (a, b) {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      var ta = dueTimestamp(a), tb = dueTimestamp(b);
+      if (ta === null && tb !== null) return 1;
+      if (tb === null && ta !== null) return -1;
+      if (ta !== tb) return ta - tb;
+      if (a.priority !== b.priority) return b.priority - a.priority;
+      return String(a.createdAt).localeCompare(String(b.createdAt));
+    });
+  }
+  function visibleTodos() {
+    var sel = state.selectedDate;
+    return sortTodos(liveTodos().filter(function (t) { return sel ? t.date === sel : true; }));
+  }
+  function todoCard(t) {
+    var tk = todayKey();
+    var isOverdue = !t.done && t.date && t.date < tk;
+    var isToday = !t.done && t.date === tk;
+    var postponed = !t.done && tsOf(t.remindAt) !== null;
+    var meta = [h('span', {
+      class: 'badge' + (isOverdue ? ' overdue' : (isToday ? ' due-today' : '')),
+      text: humanDue(t)
+    })];
+    if (t.priority === 1 && !t.done) meta.push(h('span', { class: 'badge p1', text: '重要' }));
+    if (isOverdue) meta.push(h('span', { class: 'badge overdue', text: '已过期' }));
+    if (postponed) meta.push(h('span', { class: 'badge due-today', text: '提醒已改为 ' + formatStamp(t.remindAt) }));
+    if (t.done && t.completedAt) meta.push(h('span', { class: 'badge done', text: '完成于 ' + formatStamp(t.completedAt) }));
+
+    var body = [h('div', { class: 'todo-title', text: t.title })];
+    if (t.note) body.push(h('div', { class: 'todo-meta' }, [h('span', { text: t.note })]));
+    body.push(h('div', { class: 'todo-meta' }, meta));
+    body.push(h('div', { class: 'todo-actions' }, [
+      h('button', { class: 'btn btn-sm', type: 'button', text: '详情 / 改提醒时间', onclick: function () { openDetail(t.id); } }),
+      h('button', { class: 'btn btn-sm btn-danger', type: 'button', text: '删除', onclick: function () { onDelete(t.id); } })
+    ]));
+    body.push(h('input', {
+      class: 'todo-input', type: 'text', value: t.note || '',
+      placeholder: '备注（可选，自动保存）', maxlength: '1000',
+      onchange: function (ev) { onNoteChange(t.id, ev.target.value); }
+    }));
+
+    return h('li', { class: 'todo' + (t.done ? ' done' : '') }, [
+      h('input', {
+        class: 'todo-check', type: 'checkbox', checked: t.done, title: '标记完成',
+        'aria-label': '标记完成：' + t.title,
+        onchange: function (ev) { onToggleDone(t.id, ev.target.checked); }
+      }),
+      h('div', { class: 'todo-body' }, body)
+    ]);
+  }
+  function renderTodos() {
+    var list = $('todo-list'), empty = $('todo-empty');
+    if (!list) return;
+    clear(list);
+    var items = visibleTodos();
+    var all = liveTodos();
+    var doneCount = all.filter(function (t) { return t.done; }).length;
+    var percent = all.length ? Math.round(doneCount / all.length * 100) : 0;
+    $('todo-info').textContent = (state.selectedDate ? ('筛选：' + state.selectedDate) : '全部待办') +
+      ' · 未完成 ' + (all.length - doneCount) + ' 条 / 共 ' + all.length + ' 条 · 完成度 ' + percent + '%';
+    $('cal-info').textContent = state.selectedDate
+      ? ('当前只显示 ' + state.selectedDate + ' 的待办；点该日期或「全部待办」取消筛选。')
+      : '点选某一天，可只看那天的待办；再点一次取消筛选。';
+    var nb = $('nav-todo-badge');
+    if (nb) nb.textContent = String(all.length - doneCount);
+    if (!items.length) {
+      empty.hidden = false;
+      empty.textContent = state.selectedDate ? '这一天没有待办。' : '暂无待办，点「新建待办」开始记录。';
+      return;
+    }
+    empty.hidden = true;
+    items.forEach(function (t) { list.appendChild(todoCard(t)); });
+  }
+  function renderTrash() {
+    var fc = $('trash-float-count');
+    if (fc) fc.textContent = String(trashTodos().length);
+    var tc = $('trash-count');
+    if (tc) tc.textContent = String(trashTodos().length);
+    setHidden($('trash-panel'), !(state.route === 'todo' && state.trashOpen));
+    if (!state.trashOpen) return;
+    var box = $('trash-list'), empty = $('trash-empty');
+    clear(box);
+    var list = trashTodos().slice().sort(function (a, b) {
+      return (tsOf(b.firstDeletedAt) || 0) - (tsOf(a.firstDeletedAt) || 0);
+    });
+    var now = Date.now(), nextExpire = null;
+    list.forEach(function (t) {
+      var t0 = tsOf(t.firstDeletedAt) || tsOf(t.deletedAt) || now;
+      var left = TRASH_TTL_MS - (now - t0);
+      if (nextExpire === null || left < nextExpire) nextExpire = left;
+    });
+    $('trash-info').textContent = list.length
+      ? ('共 ' + list.length + ' 条；最近一条将于 ' + humanRemain(nextExpire) + ' 后彻底删除（页面打开期间不自动清理，仅在打开/刷新时清除过期条目）。')
+      : '回收站为空。删除的待办会在这里保留 72 小时。';
+    if (!list.length) { empty.hidden = false; return; }
+    empty.hidden = true;
+    list.forEach(function (t) {
+      var t0 = tsOf(t.firstDeletedAt) || tsOf(t.deletedAt) || now;
+      var left = TRASH_TTL_MS - (now - t0);
+      box.appendChild(h('div', { class: 'trash-item' }, [
+        h('div', { class: 'trash-body' }, [
+          h('div', { class: 'trash-title', text: t.title }),
+          h('div', { class: 'todo-meta' }, [
+            h('span', { class: 'badge', text: '原定：' + humanDue(t) }),
+            h('span', { class: 'badge', text: '首次删除：' + formatStamp(t.firstDeletedAt) }),
+            h('span', { class: 'badge' + (left < 12 * 3600 * 1000 ? ' warn' : ''), text: humanRemain(left) })
+          ])
+        ]),
+        h('div', { class: 'todo-actions' }, [
+          h('button', { class: 'btn btn-sm', type: 'button', text: '恢复', onclick: function () { restoreFromTrash(t.id); } }),
+          h('button', { class: 'btn btn-sm btn-danger', type: 'button', text: '彻底删除', onclick: function () { purgeOne(t.id); } })
+        ])
+      ]));
+    });
+  }
+
+  /* =========================================================
+   * 12. 待办操作
+   * =======================================================*/
+  function onToggleDone(id, done) {
+    var t = getTodo(id);
+    if (!t) return;
+    var before = { done: t.done, completedAt: t.completedAt };
+    var wasDone = t.done;              // 闭包内只读快照，避免后续再次切换时读到新值
+    t.done = !!done;
+    t.completedAt = t.done ? nowIso() : null;
+    t.updatedAt = nowIso();
+    if (t.done) { delete state.dismissed[id]; saveDismissed(); }
+    saveTodos();
+    pushUndo((wasDone ? '恢复「' : '完成「') + t.title + '」', function () {
+      var x = getTodo(id);
+      if (!x) return;
+      x.done = before.done; x.completedAt = before.completedAt;
+    });
+    renderAll();
+    playCue('action');
+    toast(t.done ? '已完成：' + t.title : '已恢复：' + t.title);
+  }
+  function onNoteChange(id, value) {
+    var t = getTodo(id);
+    if (!t) return;
+    var note = String(value || '').slice(0, 1000);
+    if (note === t.note) return;
+    var old = t.note;
+    t.note = note; t.updatedAt = nowIso();
+    saveTodos();
+    pushUndo('修改备注「' + t.title + '」', function () {
+      var x = getTodo(id);
+      if (x) x.note = old;
+    });
+    toast('备注已保存');
+  }
+  function onDelete(id) {
+    var idx = -1;
+    for (var i = 0; i < state.todos.length; i++) if (state.todos[i].id === id) { idx = i; break; }
+    if (idx < 0) return;
+    var t = state.todos[idx];
+    var before = { deletedAt: t.deletedAt, firstDeletedAt: t.firstDeletedAt };
+    t.deletedAt = nowIso();
+    if (!t.firstDeletedAt) t.firstDeletedAt = t.deletedAt;
+    t.updatedAt = nowIso();
+    saveTodos();
+    pushUndo('删除「' + t.title + '」', function () {
+      var x = getTodo(id);
+      if (!x) return;
+      x.deletedAt = before.deletedAt; x.firstDeletedAt = before.firstDeletedAt;
+    });
+    renderAll();
+    playCue('action');
+    toast('已移入回收站：' + t.title + '（72 小时后彻底删除）');
+  }
+  function clearCompleted() {
+    var doneList = liveTodos().filter(function (t) { return t.done; });
+    if (!doneList.length) { toast('没有已完成的待办'); return; }
+    ask('清除已完成', '将把 ' + doneList.length + ' 条已完成的待办移入回收站（保留 72 小时，可恢复，也可用撤销回退）。', [
+      { label: '取消', value: null, primary: false },
+      { label: '确认清除', value: 'ok', primary: true }
+    ]).then(function (r) {
+      if (r !== 'ok') return;
+      var stamp = nowIso();
+      var before = doneList.map(function (t) { return { id: t.id, deletedAt: t.deletedAt, firstDeletedAt: t.firstDeletedAt }; });
+      doneList.forEach(function (t) {
+        t.deletedAt = stamp;
+        if (!t.firstDeletedAt) t.firstDeletedAt = stamp;
+      });
+      saveTodos();
+      pushUndo('清除 ' + doneList.length + ' 条已完成', function () {
+        before.forEach(function (b) {
+          var x = getTodo(b.id);
+          if (x) { x.deletedAt = b.deletedAt; x.firstDeletedAt = b.firstDeletedAt; }
+        });
+      });
+      renderAll();
+      playCue('action');
+      toast('已把 ' + doneList.length + ' 条已完成移入回收站');
+    });
+  }
+
+  /* =========================================================
+   * 13. 弹窗基础
+   * =======================================================*/
+  var overlay, modal;
+  var dialogState = { resolve: null, mode: null, onCancel: null };
+
+  function openDialog() {
+    overlay.hidden = false;
+    var focusable = modal.querySelector('input, select, textarea, button');
+    if (focusable && typeof focusable.focus === 'function') focusable.focus();
+  }
+  function closeDialog(value) {
+    var st = dialogState;
+    dialogState = { resolve: null, mode: null, onCancel: null };
+    overlay.hidden = true;
+    clear(modal);
+    if (st.resolve) st.resolve(value);
+  }
+  function resolveIfCurrent(myResolve, value) {
+    if (dialogState.resolve !== myResolve) return false;
+    closeDialog(value);
+    return true;
+  }
+  function modalHead(title) {
+    return h('div', { class: 'modal-head' }, [h('h3', { id: 'modal-title', text: title })]);
+  }
+  function ask(title, text, buttons) {
+    return new Promise(function (resolve) {
+      var myResolve = resolve;
+      dialogState = { resolve: resolve, mode: 'ask', onCancel: null };
+      clear(modal);
+      modal.className = 'modal';
+      modal.appendChild(modalHead(title));
+      if (text) modal.appendChild(h('div', { class: 'modal-text', text: text }));
+      var actions = h('div', { class: 'modal-actions' + (buttons.length > 2 ? ' stack' : '') });
+      buttons.forEach(function (b) {
+        actions.appendChild(h('button', {
+          class: 'btn' + (b.primary ? ' btn-primary' : ''),
+          type: 'button', text: b.label,
+          onclick: function () { resolveIfCurrent(myResolve, b.value); }
+        }));
+      });
+      modal.appendChild(actions);
+      openDialog();
+    });
+  }
+  function defaultPostponeValue() {
+    var d = new Date(Date.now() + 60 * 60 * 1000);
+    return { date: toDateKey(d), time: pad2(d.getHours()) + ':' + pad2(d.getMinutes()) };
+  }
+  function promptPostpone(title) {
+    return new Promise(function (resolve) {
+      var myResolve = resolve;
+      dialogState = { resolve: resolve, mode: 'form', onCancel: null };
+      clear(modal);
+      modal.className = 'modal';
+      modal.appendChild(modalHead('推迟提醒'));
+      modal.appendChild(h('div', { class: 'modal-text', text: '选择「' + title + '」的提醒时间，到点后会在页面内再次弹窗（仅页面打开时生效）。' }));
+      var init = defaultPostponeValue();
+      var form = h('form', { class: 'form', autocomplete: 'off' });
+      form.appendChild(h('label', { for: 'p-date', text: '日期' }));
+      form.appendChild(h('input', { id: 'p-date', type: 'date' }));
+      form.appendChild(h('label', { for: 'p-time', text: '时间' }));
+      form.appendChild(h('input', { id: 'p-time', type: 'time' }));
+      form.appendChild(h('div', { class: 'chips full' }, [
+        h('button', { class: 'btn btn-sm', type: 'button', text: '+10 分钟', onclick: function () { quick(10); } }),
+        h('button', { class: 'btn btn-sm', type: 'button', text: '+1 小时', onclick: function () { quick(60); } }),
+        h('button', { class: 'btn btn-sm', type: 'button', text: '今晚 20:00', onclick: function () { setVal(todayKey(), '20:00'); } }),
+        h('button', { class: 'btn btn-sm', type: 'button', text: '明天 09:00', onclick: function () { setVal(shiftDateKey(todayKey(), 1), '09:00'); } })
+      ]));
+      var err = h('div', { class: 'field-error full' });
+      form.appendChild(err);
+      modal.appendChild(form);
+      var dateEl = form.querySelector('#p-date'), timeEl = form.querySelector('#p-time');
+      function setVal(dk, tm) { dateEl.value = dk; timeEl.value = tm; }
+      function quick(mins) {
+        var d = new Date(Date.now() + mins * 60000);
+        setVal(toDateKey(d), pad2(d.getHours()) + ':' + pad2(d.getMinutes()));
+      }
+      setVal(init.date, init.time);
+      modal.appendChild(h('div', { class: 'modal-actions' }, [
+        h('button', { class: 'btn', type: 'button', text: '取消', onclick: function () { resolveIfCurrent(myResolve, null); } }),
+        h('button', { class: 'btn btn-primary', type: 'button', text: '确定', onclick: function () { submit(); } })
+      ]));
+      function submit() {
+        var dk = String(dateEl.value || '').trim();
+        var tm = normalizeTime(timeEl.value);
+        if (!dk || !isValidDateKey(dk)) { err.textContent = '请选择有效的日期。'; return; }
+        if (!tm) { err.textContent = '请选择有效的时间（例如 09:30）。'; return; }
+        resolveIfCurrent(myResolve, { date: dk, time: tm });
+      }
+      form.addEventListener('submit', function (ev) { ev.preventDefault(); submit(); });
+      openDialog();
+      if (typeof dateEl.focus === 'function') dateEl.focus();
+    });
+  }
+
+  /* =========================================================
+   * 14. 表单构件
+   * =======================================================*/
+  function buildForm(fields) {
+    var form = h('form', { class: 'form', autocomplete: 'off' });
+    form.appendChild(h('label', { for: 'f-title', text: '内容' }));
+    form.appendChild(h('input', { id: 'f-title', type: 'text', maxlength: '200', placeholder: '要做什么？（必填）' }));
+    form.appendChild(h('label', { for: 'f-date', text: '日期' }));
+    form.appendChild(h('div', null, [
+      h('input', { id: 'f-date', type: 'date' }),
+      h('div', { class: 'chips', style: 'margin-top:6px' }, [
+        h('button', { class: 'btn btn-sm', type: 'button', text: '无日期', onclick: function () { form.querySelector('#f-date').value = ''; } }),
+        h('button', { class: 'btn btn-sm', type: 'button', text: '今天', onclick: function () { form.querySelector('#f-date').value = todayKey(); } }),
+        h('button', { class: 'btn btn-sm', type: 'button', text: '明天', onclick: function () { form.querySelector('#f-date').value = shiftDateKey(todayKey(), 1); } })
+      ])
+    ]));
+    form.appendChild(h('label', { for: 'f-time', text: '时间' }));
+    form.appendChild(h('div', null, [
+      h('input', { id: 'f-time', type: 'time' }),
+      h('div', { class: 'subline', style: 'margin-top:4px', text: '可选。填了时间就按该时刻提醒；只填日期则当天 23:59 提醒。' })
+    ]));
+    form.appendChild(h('label', { for: 'f-priority', text: '重要' }));
+    form.appendChild(h('select', { id: 'f-priority' }, [
+      h('option', { value: '0', text: '普通' }),
+      h('option', { value: '1', text: '重要' })
+    ]));
+    form.appendChild(h('label', { for: 'f-note', text: '备注' }));
+    form.appendChild(h('textarea', { id: 'f-note', maxlength: '1000', placeholder: '可选' }));
+
+    var refs = {
+      title: form.querySelector('#f-title'),
+      date: form.querySelector('#f-date'),
+      time: form.querySelector('#f-time'),
+      priority: form.querySelector('#f-priority'),
+      note: form.querySelector('#f-note')
+    };
+    fields = fields || {};
+    refs.title.value = fields.title || '';
+    refs.date.value = fields.date || '';
+    refs.time.value = fields.time || '';
+    refs.priority.value = String(fields.priority === 1 ? 1 : 0);
+    refs.note.value = fields.note || '';
+    return { form: form, refs: refs };
+  }
+  function readForm(refs) {
+    return {
+      title: refs.title.value.trim(),
+      date: String(refs.date.value || '').trim(),
+      time: normalizeTime(refs.time.value),
+      priority: refs.priority.value === '1' ? 1 : 0,
+      note: String(refs.note.value || '').trim()
+    };
+  }
+  function validateForm(refs) {
+    var v = readForm(refs);
+    if (!v.title) { refs.title.focus(); return { error: '请填写待办内容。' }; }
+    if (v.date && !isValidDateKey(v.date)) return { error: '日期格式不正确。' };
+    if (String(refs.time.value || '').trim() && !v.time) return { error: '时间格式不正确（例如 09:30）。' };
+    v.time = v.date ? v.time : '';
+    return { value: v };
+  }
+  function openNew(defaultDate) {
+    return new Promise(function (resolve) {
+      var myResolve = resolve;
+      dialogState = { resolve: resolve, mode: 'form', onCancel: null };
+      clear(modal);
+      modal.className = 'modal';
+      modal.appendChild(modalHead('新建待办'));
+      var built = buildForm({ date: defaultDate || state.selectedDate || '' });
+      modal.appendChild(built.form);
+      var err = h('div', { class: 'field-error full' });
+      built.form.appendChild(err);
+      modal.appendChild(h('div', { class: 'modal-actions' }, [
+        h('button', { class: 'btn', type: 'button', text: '取消', onclick: function () { resolveIfCurrent(myResolve, null); } }),
+        h('button', { class: 'btn btn-primary', type: 'button', text: '保存', onclick: function () { submit(); } })
+      ]));
+      function submit() {
+        var res = validateForm(built.refs);
+        if (res.error) { err.textContent = res.error; return; }
+        resolveIfCurrent(myResolve, res.value);
+      }
+      built.form.addEventListener('submit', function (ev) { ev.preventDefault(); submit(); });
+      openDialog();
+      if (typeof built.refs.title.focus === 'function') built.refs.title.focus();
+    });
+  }
+  function openEditor(defaultDate) {
+    return openNew(defaultDate).then(function (v) {
+      if (!v) return null;
+      var t = normalizeTodo({
+        id: uid(), title: v.title, note: v.note, date: v.date, time: v.time,
+        priority: v.priority, done: false, createdAt: nowIso(), updatedAt: nowIso()
+      });
+      state.todos.push(t);
+      if (v.date) {
+        var d = parseDateKey(v.date);
+        state.viewYear = d.getFullYear();
+        state.viewMonth = d.getMonth();
+      }
+      saveTodos();
+      pushUndo('新建「' + t.title + '」', function () {
+        state.todos = state.todos.filter(function (x) { return x.id !== t.id; });
+      });
+      renderAll();
+      toast('已添加：' + t.title);
+      return t;
+    });
+  }
+
+  /* =========================================================
+   * 15. 批量新建（多选日期 / 区间，单次上限 50）
+   * =======================================================*/
+  function createBatch(dates, fields) {
+    var list = uniqDates(dates);
+    var res = { created: [], failed: [], ids: [] };
+    var liveTotal = liveTodos().length;
+    var hardCap = 2000;
+    list.forEach(function (dk) {
+      if (!isValidDateKey(dk)) { res.failed.push({ date: dk, reason: '日期格式无效' }); return; }
+      if (res.created.length >= BATCH_MAX) {
+        res.failed.push({ date: dk, reason: '超出单次上限 ' + BATCH_MAX + ' 条（本次未创建）' });
+        return;
+      }
+      if (liveTotal + res.created.length >= hardCap) {
+        res.failed.push({ date: dk, reason: '本地待办总数已达上限 ' + hardCap + ' 条' });
+        return;
+      }
+      var t = normalizeTodo({
+        id: uid(), title: fields.title, note: fields.note, date: dk, time: fields.time,
+        priority: fields.priority, done: false, createdAt: nowIso(), updatedAt: nowIso()
+      });
+      if (!t) { res.failed.push({ date: dk, reason: '内容校验未通过（标题为空）' }); return; }
+      state.todos.push(t);
+      res.created.push(dk);
+      res.ids.push(t.id);
+    });
+    if (res.created.length) {
+      saveTodos();
+      var ids = res.ids.slice();
+      pushUndo('批量新建 ' + res.created.length + ' 条', function () {
+        state.todos = state.todos.filter(function (x) { return ids.indexOf(x.id) < 0; });
+      });
+      var d = parseDateKey(res.created[0]);
+      state.viewYear = d.getFullYear();
+      state.viewMonth = d.getMonth();
+      renderAll();
+    }
+    return res;
+  }
+  function batchResultText(res) {
+    var lines = ['成功 ' + res.created.length + ' 条' + (res.created.length ? '：' + res.created.join('、') : '')];
+    if (res.failed.length) {
+      lines.push('', '失败 ' + res.failed.length + ' 条：');
+      res.failed.forEach(function (f) { lines.push('· ' + f.date + ' → ' + f.reason); });
+    }
+    return lines.join('\n');
+  }
+  function showBatchSummary(res) {
+    var failCount = res.failed.length;
+    var body = h('div', null, [
+      h('div', { class: 't', text: failCount
+        ? ('部分成功：成功 ' + res.created.length + ' 条，失败 ' + failCount + ' 条')
+        : ('全部成功：已创建 ' + res.created.length + ' 条独立待办') })
+    ]);
+    if (res.created.length) {
+      body.appendChild(h('div', { class: 'subline', style: 'margin-top:8px', text: '✅ 创建成功：' + res.created.join('、') }));
+    }
+    if (failCount) {
+      var ul = h('ul', { class: 'fail' });
+      res.failed.forEach(function (f) { ul.appendChild(h('li', { text: f.date + ' → ' + f.reason })); });
+      body.appendChild(h('div', { class: 'subline', style: 'margin-top:8px', text: '❌ 创建失败：' }));
+      body.appendChild(ul);
+    }
+    var box = h('div', { class: 'batch-summary ' + (failCount ? 'has-fail' : '') }, [body]);
+    ask(failCount ? '批量新建结果（部分成功）' : '批量新建结果', '', [{ label: '知道了', value: 'ok', primary: true }]);
+    var actions = modal.querySelector('.modal-actions');
+    if (actions) modal.insertBefore(box, actions);
+    else modal.appendChild(box);
+  }
+  function openBatchCreate() {
+    return new Promise(function (resolve) {
+      var myResolve = resolve;
+      dialogState = { resolve: resolve, mode: 'form', onCancel: null };
+      clear(modal);
+      modal.className = 'modal wide';
+      modal.appendChild(modalHead('批量新建待办'));
+
+      var form = h('form', { class: 'form', autocomplete: 'off' });
+      form.appendChild(h('label', { for: 'f-title', text: '内容' }));
+      form.appendChild(h('input', { id: 'f-title', type: 'text', maxlength: '200', placeholder: '要做什么？（必填）' }));
+      form.appendChild(h('label', { for: 'f-time', text: '时间' }));
+      form.appendChild(h('input', { id: 'f-time', type: 'time' }));
+      form.appendChild(h('label', { for: 'f-priority', text: '重要' }));
+      form.appendChild(h('select', { id: 'f-priority' }, [
+        h('option', { value: '0', text: '普通' }),
+        h('option', { value: '1', text: '重要' })
+      ]));
+      form.appendChild(h('label', { for: 'f-note', text: '备注' }));
+      form.appendChild(h('textarea', { id: 'f-note', maxlength: '1000', placeholder: '可选' }));
+      var refs = {
+        title: form.querySelector('#f-title'),
+        time: form.querySelector('#f-time'),
+        priority: form.querySelector('#f-priority'),
+        note: form.querySelector('#f-note')
+      };
+
+      var picks = state.multiPick.slice(0, BATCH_MAX);
+      var rangeStart = null, rangeMode = false;
+      var viewY = state.viewYear, viewM = state.viewMonth;
+      var countPill = h('span', { class: 'count-pill' });
+      var chipsBox = h('div', { class: 'pick-cells' });
+      var gridBox = h('div', { class: 'pick-grid' });
+      var gridTitle = h('span', { class: 'cal-title' });
+      var rangeHint = h('div', { class: 'subline' });
+      var errLine = h('div', { class: 'field-error' });
+      var rangeBtn = h('button', {
+        class: 'btn btn-sm', type: 'button', text: '区间多选',
+        onclick: function () { rangeMode = !rangeMode; rangeStart = null; errLine.textContent = ''; sync(); }
+      });
+
+      function addLocal(dates) {
+        var list = uniqDates(dates);
+        var added = 0, ok = true, reason = '';
+        for (var i = 0; i < list.length; i++) {
+          if (picks.indexOf(list[i]) >= 0) continue;
+          if (picks.length >= BATCH_MAX) { ok = false; reason = '已达单次上限 ' + BATCH_MAX + ' 条'; break; }
+          picks.push(list[i]);
+          added++;
+        }
+        picks = uniqDates(picks);
+        return { added: added, ok: ok, reason: reason, total: list.length };
+      }
+      function stepMonth(delta) {
+        var d = new Date(viewY, viewM + delta, 1);
+        viewY = d.getFullYear(); viewM = d.getMonth();
+        sync();
+      }
+      function toggleDate(key) {
+        errLine.textContent = '';
+        if (rangeMode) {
+          if (!rangeStart) { rangeStart = key; sync(); return; }
+          var all = expandDateRange(rangeStart, key);
+          var r = addLocal(all);
+          rangeStart = null;
+          if (!r.ok) {
+            errLine.textContent = '区间共 ' + all.length + ' 天，超过上限 ' + BATCH_MAX + ' 条：已加入前 ' + r.added +
+              ' 天，其余 ' + (all.length - r.added) + ' 天未加入（' + r.reason + '）。请分批创建。';
+          }
+          sync();
+          return;
+        }
+        var i = picks.indexOf(key);
+        if (i >= 0) picks.splice(i, 1);
+        else {
+          var one = addLocal([key]);
+          if (!one.ok) errLine.textContent = '已选满 ' + BATCH_MAX + ' 天，' + key + ' 未加入。';
+        }
+        sync();
+      }
+      function renderGrid() {
+        clear(gridBox);
+        gridTitle.textContent = viewY + ' 年 ' + (viewM + 1) + ' 月';
+        ['一', '二', '三', '四', '五', '六', '日'].forEach(function (w) {
+          gridBox.appendChild(h('div', { class: 'cal-dow', text: w }));
+        });
+        var first = new Date(viewY, viewM, 1);
+        var off = (first.getDay() + 6) % 7;
+        var start = new Date(viewY, viewM, 1 - off);
+        for (var i = 0; i < 42; i++) {
+          (function (i) {
+            var d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+            var key = toDateKey(d);
+            var cls = 'pick-cell';
+            if (d.getMonth() !== viewM) cls += ' out';
+            if (picks.indexOf(key) >= 0 || rangeStart === key) cls += ' sel';
+            gridBox.appendChild(h('button', {
+              class: cls, type: 'button', text: String(d.getDate()), 'data-date': key,
+              title: key + (picks.indexOf(key) >= 0 ? ' · 已选' : ''),
+              onclick: function () { toggleDate(key); }
+            }));
+          })(i);
+        }
+      }
+      function sync() {
+        renderGrid();
+        countPill.textContent = '已选 ' + picks.length + ' / ' + BATCH_MAX + ' 条';
+        if (picks.length >= BATCH_MAX) countPill.classList.add('warn'); else countPill.classList.remove('warn');
+        rangeBtn.textContent = rangeMode ? (rangeStart ? '区间：已选起点，请点终点' : '区间：请点起点') : '区间多选';
+        if (rangeMode) rangeBtn.classList.add('on'); else rangeBtn.classList.remove('on');
+        rangeHint.textContent = rangeMode
+          ? (rangeStart ? ('区间起点：' + rangeStart + '，请在下方日历点终点日期') : '区间多选：请在下方日历点起点日期')
+          : '';
+        clear(chipsBox);
+        picks.forEach(function (key) {
+          chipsBox.appendChild(h('span', { class: 'pick-chip' }, [
+            h('span', { text: key }),
+            h('button', {
+              type: 'button', text: '×', title: '移除 ' + key,
+              onclick: function () { picks = picks.filter(function (x) { return x !== key; }); sync(); }
+            })
+          ]));
+        });
+        state.multiPick = picks.slice();
+        savePickState();
+      }
+
+      form.appendChild(h('div', { class: 'batch-dates full' }, [
+        h('div', { class: 'chips' }, [
+          countPill,
+          rangeBtn,
+          h('button', {
+            class: 'btn btn-sm', type: 'button', text: '全选本月',
+            onclick: function () {
+              var all = monthDates(viewY, viewM);
+              var r = addLocal(all);
+              errLine.textContent = r.ok ? '' : ('本月 ' + all.length + ' 天，超过上限 ' + BATCH_MAX + ' 条：已加入前 ' + r.added + ' 天。请分批创建。');
+              sync();
+            }
+          }),
+          h('button', {
+            class: 'btn btn-sm', type: 'button', text: '选中 14 天',
+            onclick: function () {
+              var ds = [], cur = todayKey();
+              for (var i = 0; i < 14; i++) { ds.push(cur); cur = shiftDateKey(cur, 1); }
+              var r = addLocal(ds);
+              errLine.textContent = r.ok ? '' : ('超过上限：已加入前 ' + r.added + ' 天。');
+              sync();
+            }
+          }),
+          h('button', { class: 'btn btn-sm', type: 'button', text: '清空选择', onclick: function () { picks = []; rangeStart = null; errLine.textContent = ''; sync(); } })
+        ]),
+        rangeHint,
+        h('div', { class: 'chips' }, [
+          h('button', { class: 'btn-icon', type: 'button', text: '‹', onclick: function () { stepMonth(-1); } }),
+          gridTitle,
+          h('button', { class: 'btn-icon', type: 'button', text: '›', onclick: function () { stepMonth(1); } })
+        ]),
+        gridBox,
+        chipsBox,
+        errLine
+      ]));
+      var err = h('div', { class: 'field-error full' });
+      form.appendChild(err);
+      modal.appendChild(form);
+      modal.appendChild(h('div', { class: 'modal-actions' }, [
+        h('button', { class: 'btn', type: 'button', text: '取消', onclick: function () { resolveIfCurrent(myResolve, null); } }),
+        h('button', { class: 'btn btn-primary', type: 'button', text: '生成待办', onclick: function () { submit(); } })
+      ]));
+
+      function submit() {
+        var title = refs.title.value.trim();
+        var time = normalizeTime(refs.time.value);
+        if (!title) { err.textContent = '请填写待办内容。'; refs.title.focus(); return; }
+        if (String(refs.time.value || '').trim() && !time) { err.textContent = '时间格式不正确（例如 09:30）。'; return; }
+        if (!picks.length) { err.textContent = '请至少选择一个日期。'; return; }
+        if (picks.length > BATCH_MAX) { err.textContent = '最多 ' + BATCH_MAX + ' 条，请减少日期数量。'; return; }
+        state.multiPick = picks.slice();
+        savePickState();
+        resolveIfCurrent(myResolve, {
+          fields: { title: title, note: refs.note.value.trim(), time: time, priority: refs.priority.value === '1' ? 1 : 0 },
+          dates: picks.slice()
+        });
+      }
+      form.addEventListener('submit', function (ev) { ev.preventDefault(); submit(); });
+      sync();
+      openDialog();
+      if (typeof refs.title.focus === 'function') refs.title.focus();
+    });
+  }
+  function handleBatchPayload(payload) {
+    if (!payload) return null;
+    var res = createBatch(payload.dates, payload.fields);
+    renderAll();
+    if (res.created.length) {
+      toast(res.failed.length
+        ? ('已创建 ' + res.created.length + ' 条，' + res.failed.length + ' 条失败')
+        : ('已创建 ' + res.created.length + ' 条待办'));
+    }
+    showBatchSummary(res);
+    return res;
+  }
+  function openBatch() { return openBatchCreate().then(handleBatchPayload); }
+
+  /* =========================================================
+   * 16. 详情
+   * =======================================================*/
+  function openDetail(id) {
+    var t = getTodo(id);
+    if (!t) return;
+    return new Promise(function (resolve) {
+      var myResolve = resolve;
+      dialogState = { resolve: resolve, mode: 'form', onCancel: null };
+      clear(modal);
+      modal.className = 'modal';
+      modal.appendChild(modalHead('待办详情'));
+      var built = buildForm(t);
+      modal.appendChild(built.form);
+      var err = h('div', { class: 'field-error full' });
+
+      var init = defaultPostponeValue();
+      var remindDate = h('input', { id: 'r-date', type: 'date' });
+      var remindTime = h('input', { id: 'r-time', type: 'time' });
+      function setRemind(dk, tm) { remindDate.value = dk; remindTime.value = tm; }
+      if (tsOf(t.remindAt) !== null) {
+        var rd = new Date(tsOf(t.remindAt));
+        setRemind(toDateKey(rd), pad2(rd.getHours()) + ':' + pad2(rd.getMinutes()));
+      } else setRemind(init.date, init.time);
+      function quick(mins) {
+        var d = new Date(Date.now() + mins * 60000);
+        setRemind(toDateKey(d), pad2(d.getHours()) + ':' + pad2(d.getMinutes()));
+      }
+      function applyRemind() {
+        var dk = String(remindDate.value || '').trim();
+        var tm = normalizeTime(remindTime.value);
+        if (!dk || !isValidDateKey(dk) || !tm) { err.textContent = '请填写有效的提醒日期和时间。'; return; }
+        var d = parseDateKey(dk), parts = tm.split(':');
+        d.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+        var newAt = d.toISOString();
+        delete state.dismissed[id];
+        t.remindAt = newAt; t.updatedAt = nowIso();
+        if (state.snapshot) state.snapshot.ids = state.snapshot.ids.filter(function (x) { return x !== id; });
+        saveTodos(); saveDismissed(); saveSnapshot();
+        renderAll();
+        toast('已把「' + t.title + '」的提醒时间改为 ' + formatStamp(newAt));
+        resolveIfCurrent(myResolve, { saved: true });
+      }
+      function resetRemind() {
+        t.remindAt = null; t.updatedAt = nowIso();
+        delete state.dismissed[id];
+        saveTodos(); saveDismissed();
+        renderAll();
+        toast('已恢复默认提醒时间');
+        resolveIfCurrent(myResolve, { saved: true });
+      }
+      built.form.appendChild(h('div', { class: 'full' }, [
+        h('div', { class: 'form-legend', text: '提醒时间（可二次更改）' + (t.remindAt ? '：当前已改为 ' + formatStamp(t.remindAt) : '：当前按到期时刻提醒') }),
+        h('div', { class: 'chips' }, [
+          remindDate, remindTime,
+          h('button', { class: 'btn btn-sm', type: 'button', text: '+10 分钟', onclick: function () { quick(10); } }),
+          h('button', { class: 'btn btn-sm', type: 'button', text: '+1 小时', onclick: function () { quick(60); } }),
+          h('button', { class: 'btn btn-sm', type: 'button', text: '今晚 20:00', onclick: function () { setRemind(todayKey(), '20:00'); } }),
+          h('button', { class: 'btn btn-sm', type: 'button', text: '明天 09:00', onclick: function () { setRemind(shiftDateKey(todayKey(), 1), '09:00'); } })
+        ]),
+        h('div', { class: 'chips', style: 'margin-top:8px' }, [
+          h('button', { class: 'btn btn-sm', type: 'button', text: '更新提醒时间', onclick: function () { applyRemind(); } }),
+          h('button', { class: 'btn btn-sm btn-ghost', type: 'button', text: '恢复为默认', onclick: function () { resetRemind(); } })
+        ])
+      ]));
+      built.form.appendChild(err);
+
+      modal.appendChild(h('div', { class: 'modal-actions between' }, [
+        h('div', { class: 'item-ops' }, [
+          h('button', {
+            class: 'btn btn-sm btn-danger', type: 'button', text: '删除',
+            onclick: function () { resolveIfCurrent(myResolve, { deleted: true }); onDelete(id); }
+          })
+        ]),
+        h('div', { class: 'item-ops' }, [
+          h('button', { class: 'btn', type: 'button', text: '关闭', onclick: function () { resolveIfCurrent(myResolve, null); } }),
+          h('button', { class: 'btn btn-primary', type: 'button', text: '保存修改', onclick: function () { save(); } })
+        ])
+      ]));
+
+      function save() {
+        var res = validateForm(built.refs);
+        if (res.error) { err.textContent = res.error; return; }
+        var v = res.value;
+        t.title = v.title; t.date = v.date; t.time = v.time; t.priority = v.priority; t.note = v.note;
+        t.updatedAt = nowIso();
+        delete state.dismissed[id];
+        if (state.snapshot) state.snapshot.ids = state.snapshot.ids.filter(function (x) { return x !== id; });
+        saveTodos(); saveDismissed(); saveSnapshot();
+        renderAll();
+        toast('已保存：' + t.title);
+        resolveIfCurrent(myResolve, { saved: true });
+      }
+      built.form.addEventListener('submit', function (ev) { ev.preventDefault(); save(); });
+      openDialog();
+      if (typeof built.refs.title.focus === 'function') built.refs.title.focus();
+    });
+  }
+
+  /* =========================================================
+   * 17. 声音（分区开关 + Web Audio 现场合成；无音频文件）
+   * =======================================================*/
+  var audioCtx = null;
+  function ensureAudio() {
+    try {
+      var Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) return null;
+      if (!audioCtx) audioCtx = new Ctor();
+      if (audioCtx.state === 'suspended' && typeof audioCtx.resume === 'function') audioCtx.resume();
+      return audioCtx;
+    } catch (e) {
+      return null;
+    }
+  }
+  function soundEnabled(kind) {
+    if (!state.sounds.master) return false;
+    if (kind === 'reminder') return state.sounds.reminder !== false;
+    if (kind === 'upload') return state.sounds.upload !== false;
+    if (kind === 'action') return state.sounds.action === true;
+    return false;
+  }
+  function beepPattern(kind) {
+    if (kind === 'reminder') return [[880, 0, 0.20], [880, 0.26, 0.20]];
+    if (kind === 'upload') return [[660, 0, 0.14], [990, 0.16, 0.16]];
+    return [[520, 0, 0.10]];
+  }
+  function playCue(kind) {
+    if (!soundEnabled(kind)) return false;
+    var ctx = ensureAudio();
+    if (!ctx) return false;
+    try {
+      var now = ctx.currentTime;
+      beepPattern(kind).forEach(function (note) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = note[0];
+        var t0 = now + note[1];
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(kind === 'action' ? 0.07 : 0.14, t0 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + note[2]);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + note[2] + 0.02);
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  function saveSounds() { lsSet(STORAGE.sound, state.sounds); }
+  function renderSounds() {
+    [['sw-sound', 'master'], ['sw-sound-reminder', 'reminder'], ['sw-sound-upload', 'upload'], ['sw-sound-action', 'action']]
+      .forEach(function (pair) {
+        var el = $(pair[0]);
+        if (!el) return;
+        if (state.sounds[pair[1]]) el.classList.add('on'); else el.classList.remove('on');
+        el.setAttribute('aria-checked', state.sounds[pair[1]] ? 'true' : 'false');
+      });
+    var st = $('set-theme');
+    if (st) st.textContent = state.theme === 'dark' ? '切换为浅色' : '切换为深色';
+  }
+  function toggleSound(key) {
+    if (key === 'master') state.sounds.master = !state.sounds.master;
+    else state.sounds[key] = !state.sounds[key];
+    saveSounds();
+    renderSounds();
+    if (state.sounds.master) playCue(key === 'master' ? 'reminder' : key);
+    toast('已更新提示音设置');
+  }
+
+  /* =========================================================
+   * 18. 提醒调度（提醒弹窗内不再有提示音开关，改由设置页控制）
+   * =======================================================*/
+  var snoozeUntil = {};
+  function inSnooze(t) { return snoozeUntil[t.id] !== undefined && snoozeUntil[t.id] > Date.now(); }
+  function isDismissed(id) { return !!state.dismissed[id]; }
+  function pendingReminders(now) {
+    now = now || Date.now();
+    return liveTodos().filter(function (t) {
+      if (t.done || !t.date || isDismissed(t.id) || inSnooze(t)) return false;
+      var ts = remindTimestamp(t);
+      return ts !== null && ts <= now;
+    });
+  }
+  function buildReminderList(now) {
+    now = now || Date.now();
+    var ready = pendingReminders(now);
+    var postponed = liveTodos().filter(function (t) {
+      if (t.done || !t.date || isDismissed(t.id) || inSnooze(t)) return false;
+      var rt = tsOf(t.remindAt);
+      return rt !== null && rt > now;
+    });
+    return {
+      ready: ready, postponed: postponed, items: ready.concat(postponed),
+      key: ready.map(function (t) { return t.id + '@' + (dueTimestamp(t) || 0); }).join('|')
+    };
+  }
+  function checkReminders() {
+    if (dialogState.mode) return;
+    var pack = buildReminderList();
+    if (!pack.items.length) return;
+    if (state.snapshot && pack.key === (state.snapshot.key || '')) return;
+    state.lastReminderKey = pack.key;
+    if (pack.ready.length) {
+      state.snapshot = makeSnapshot(pack.items);
+      state.snapshot.key = pack.key;
+      saveSnapshot();
+    }
+    playCue('reminder');
+    showReminder(pack.items);
+  }
+  function markDismissed(id) { state.dismissed[id] = true; saveDismissed(); }
+  function unresolvedInSnapshot() {
+    if (!state.snapshot) return [];
+    return state.snapshot.ids.map(function (id) { return getTodo(id); })
+      .filter(function (t) { return t && !t.done && !isDeleted(t) && !isDismissed(t.id) && !inSnooze(t); });
+  }
+  function settleRest(id) {
+    unresolvedInSnapshot().filter(function (t) { return t.id !== id; })
+      .forEach(function (t) { markDismissed(t.id); });
+    state.snapshot = null;
+    state.lastReminderKey = '';
+    saveSnapshot();
+  }
+  function showReminder(list) {
+    var myToken = list;
+    dialogState = { resolve: null, mode: 'reminder', onCancel: null, token: myToken };
+    clear(modal);
+    modal.className = 'modal';
+    modal.appendChild(modalHead('待办提醒（' + list.length + ' 条）'));
+    var wrap = h('div', { class: 'reminder-list', style: 'margin-top:10px' });
+    list.forEach(function (t) {
+      var rt = tsOf(t.remindAt);
+      var isPostponed = rt !== null && rt > Date.now();
+      var line = isPostponed
+        ? ('提醒已推迟到 ' + formatStamp(t.remindAt) + '（' + humanFromNow(t.remindAt) + '）')
+        : ('到期时间：' + humanDue(t));
+      wrap.appendChild(h('div', { class: 'reminder-item' + (isPostponed ? ' postponed' : '') }, [
+        h('div', { class: 't', text: t.title }),
+        h('div', { class: 'm', text: line + (t.note ? '　备注：' + t.note : '') }),
+        h('div', { class: 'ops' }, [
+          h('button', {
+            class: 'btn btn-sm btn-primary', type: 'button', text: '完成',
+            onclick: function () {
+              if (dialogState.token !== myToken) return;
+              var now2 = nowIso();
+              t.done = true; t.completedAt = now2; t.updatedAt = now2;
+              delete state.dismissed[t.id];
+              saveTodos(); saveDismissed();
+              pushUndo('完成「' + t.title + '」', function () {
+                var x = getTodo(t.id);
+                if (x) { x.done = false; x.completedAt = null; }
+              });
+              var stillOpen = list.filter(function (x) { return !x.done; });
+              if (stillOpen.length) { settleRest(t.id); showReminder(stillOpen); }
+              else closeReminder();
+              renderAll();
+              toast('已完成：' + t.title);
+            }
+          }),
+          h('button', {
+            class: 'btn btn-sm', type: 'button', text: '稍后 10 分钟',
+            onclick: function () {
+              if (dialogState.token !== myToken) return;
+              snoozeUntil[t.id] = Date.now() + SNOOZE_MS;
+              delete state.dismissed[t.id];
+              saveDismissed();
+              var rest = list.filter(function (x) { return x.id !== t.id; });
+              if (rest.length) showReminder(rest); else closeReminder();
+              toast('「' + t.title + '」将在 10 分钟后再次提醒');
+            }
+          }),
+          h('button', {
+            class: 'btn btn-sm', type: 'button', text: '推迟到…',
+            onclick: function () {
+              if (dialogState.token !== myToken) return;
+              promptPostpone(t.title).then(function (r) {
+                if (!r) { showReminder(list); return; }
+                var d = parseDateKey(r.date), parts = r.time.split(':');
+                d.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+                t.remindAt = d.toISOString();
+                delete state.dismissed[t.id];
+                saveTodos(); saveDismissed();
+                showReminder(list);
+                renderAll();
+                toast('「' + t.title + '」的提醒时间改为 ' + formatStamp(t.remindAt));
+              });
+            }
+          }),
+          h('button', {
+            class: 'btn btn-sm', type: 'button', text: '不再提醒',
+            onclick: function () {
+              if (dialogState.token !== myToken) return;
+              markDismissed(t.id);
+              var rest = list.filter(function (x) { return x.id !== t.id; });
+              if (rest.length) showReminder(rest); else closeReminder();
+              toast('「' + t.title + '」本条不再提醒');
+            }
+          })
+        ])
+      ]));
+    });
+    modal.appendChild(wrap);
+    modal.appendChild(h('div', { class: 'reminder-foot' }, [
+      h('button', {
+        class: 'btn btn-sm', type: 'button', text: '稍后 10 分钟（全部）',
+        onclick: function () {
+          if (dialogState.token !== myToken) return;
+          list.forEach(function (t) { snoozeUntil[t.id] = Date.now() + SNOOZE_MS; });
+          closeReminder();
+          toast('全部推迟 10 分钟提醒');
+        }
+      }),
+      h('button', {
+        class: 'btn btn-sm', type: 'button', text: '全部标记完成',
+        onclick: function () {
+          if (dialogState.token !== myToken) return;
+          var now2 = nowIso();
+          list.forEach(function (t) { t.done = true; t.completedAt = now2; t.updatedAt = now2; });
+          saveTodos();
+          closeReminder();
+          renderAll();
+          toast('已把 ' + list.length + ' 条标记为完成');
+        }
+      }),
+      h('button', {
+        class: 'btn btn-sm', type: 'button', text: '关闭（其余不再重复提醒）',
+        onclick: function () {
+          if (dialogState.token !== myToken) return;
+          list.forEach(function (t) { markDismissed(t.id); });
+          closeReminder();
+          toast('其余条目本次不再重复提醒');
+        }
+      })
+    ]));
+    modal.appendChild(h('div', { class: 'subline', style: 'margin-top:8px', text: '此提醒只在页面打开时出现，不会发送系统通知；提示音可在「设置」中按功能开关。' }));
+    overlay.hidden = false;
+    var first = modal.querySelector('button');
+    if (first && typeof first.focus === 'function') first.focus();
+  }
+  function closeReminder() {
+    state.snapshot = null;
+    state.lastReminderKey = '';
+    saveSnapshot();
+    dialogState = { resolve: null, mode: null, onCancel: null, token: null };
+    overlay.hidden = true;
+    clear(modal);
+  }
+
+  /* =========================================================
+   * 19. 轻提示
+   * =======================================================*/
+  var toastTimer = null;
+  var toastAction = null;
+  function toast(msg, actionLabel, action) {
+    var box = $('toast'), m = $('toast-msg'), b = $('toast-btn');
+    if (!box) return;
+    m.textContent = msg;
+    if (actionLabel && typeof action === 'function') {
+      toastAction = action;
+      b.hidden = false;
+      b.textContent = actionLabel;
+      b.onclick = function () {
+        box.hidden = true;
+        var fn = toastAction;
+        toastAction = null;
+        if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+        if (fn) fn();
+      };
+    } else {
+      toastAction = null;
+      b.hidden = true;
+      b.onclick = null;
+    }
+    box.hidden = false;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      box.hidden = true;
+      toastAction = null;
+      toastTimer = null;
+    }, actionLabel ? 12000 : 3200);
+  }
+
+  /* =========================================================
+   * 20. 编码探测 / 解码
+   * =======================================================*/
+  function sniffEncoding(bytes) {
+    if (bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) return 'utf-8';
+    if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) return 'utf-16le';
+    if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) return 'utf-16be';
+    try {
+      new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      return 'utf-8';
+    } catch (e) { /* 非 UTF-8，继续候选 */ }
+    var candidates = ['gb18030', 'big5', 'shift_jis', 'euc-kr', 'windows-1252'];
+    for (var i = 0; i < candidates.length; i++) {
+      try {
+        new TextDecoder(candidates[i], { fatal: true }).decode(bytes);
+        return candidates[i];
+      } catch (e2) { /* 下一个 */ }
+    }
+    return 'utf-8';
+  }
+  function decodeQuality(text) {
+    if (!text.length) return 1;
+    var bad = 0;
+    for (var i = 0; i < text.length; i++) if (text.charCodeAt(i) === 0xFFFD) bad++;
+    return 1 - bad / text.length;
+  }
+  function decodeBuffer(buffer, encoding) {
+    var enc = encoding || 'utf-8';
+    try { return new TextDecoder(enc).decode(buffer); }
+    catch (e) {
+      try { return new TextDecoder('utf-8').decode(buffer); } catch (e2) { return ''; }
+    }
+  }
+  var ENC_LABEL = {
+    'utf-8': 'UTF-8', 'utf-16le': 'UTF-16LE', 'utf-16be': 'UTF-16BE',
+    'gb18030': 'GB18030/GBK', 'big5': 'BIG5', 'shift_jis': 'Shift-JIS',
+    'euc-kr': 'EUC-KR', 'windows-1252': 'Windows-1252'
+  };
+  function encText(enc) { return ENC_LABEL[enc] || enc || '未知'; }
+
+  /* =========================================================
+   * 21. 书架：目录授权（File System Access API + IndexedDB 句柄）
+   * =======================================================*/
+  function fsSupported() { return typeof window.showDirectoryPicker === 'function'; }
+  function isFileProtocol() {
+    try { return String((window.location && window.location.protocol) || '') === 'file:'; }
+    catch (e) { return false; }
+  }
+  function idbOpen() {
+    return new Promise(function (resolve, reject) {
+      if (!window.indexedDB) { reject(new Error('当前环境不支持目录句柄持久化')); return; }
+      var req = window.indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore(IDB_STORE); };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error || new Error('打开本地句柄库失败')); };
+    });
+  }
+  function idbSet(key, value) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).put(value, key);
+        tx.oncomplete = function () { resolve(true); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+  function idbGet(key) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(IDB_STORE, 'readonly');
+        var req = tx.objectStore(IDB_STORE).get(key);
+        req.onsuccess = function () { resolve(req.result || null); };
+        req.onerror = function () { reject(req.error); };
+      });
+    });
+  }
+  function dirPermission(handle, mode) {
+    if (!handle) return Promise.resolve('denied');
+    if (typeof handle.queryPermission !== 'function') return Promise.resolve('granted');
+    return handle.queryPermission({ mode: mode || 'readwrite' });
+  }
+  function requestDirPermission(handle, mode) {
+    if (!handle || typeof handle.requestPermission !== 'function') return Promise.resolve('granted');
+    return handle.requestPermission({ mode: mode || 'readwrite' });
+  }
+  function handlePickerError(err) {
+    if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) {
+      toast('已取消选择 book 文件夹');
+      return null;
+    }
+    ask('无法访问文件夹', '授权失败：' + (err && err.message ? err.message : err) +
+      '\n\n请确认使用 Chrome / Edge，并通过本地 HTTP 服务访问（http://127.0.0.1:8000）。', [
+      { label: '知道了', value: 'ok', primary: true }
+    ]);
+    return null;
+  }
+  function adoptDirHandle(handle) {
+    if (!handle) return Promise.resolve(null);
+    state.dirHandle = handle;
+    state.dirReady = true;
+    state.bookDirName = handle.name || 'book';
+    lsSet(STORAGE.dirName, state.bookDirName);
+    return idbSet(IDB_KEY, handle).catch(function () { return null; }).then(function () {
+      toast('已选择 book 文件夹：' + state.bookDirName);
+      return refreshShelfFromDisk();
+    }).then(function () {
+      renderAll(); syncFloats();
+      return handle;
+    });
+  }
+  function pickBookFolder() {
+    if (!fsSupported()) {
+      ask('当前浏览器不支持', '书架需要 File System Access API：请使用 Chrome / Edge，并通过本地 HTTP 服务访问（例如 http://127.0.0.1:8000），不要用 file:// 直接打开。', [
+        { label: '知道了', value: 'ok', primary: true }
+      ]);
+      return Promise.resolve(null);
+    }
+    if (state.dirHandle) {
+      return requestDirPermission(state.dirHandle).then(function (p) {
+        if (p === 'granted') return state.dirHandle;
+        return window.showDirectoryPicker({ id: 'zapp-books', mode: 'readwrite' });
+      }).then(adoptDirHandle).catch(handlePickerError);
+    }
+    return window.showDirectoryPicker({ id: 'zapp-books', mode: 'readwrite' })
+      .then(adoptDirHandle).catch(handlePickerError);
+  }
+  function restoreDirHandle() {
+    return idbGet(IDB_KEY).then(function (handle) {
+      if (!handle) return null;
+      state.dirHandle = handle;
+      state.bookDirName = handle.name || state.bookDirName;
+      return dirPermission(handle).then(function (p) {
+        state.dirReady = (p === 'granted');
+        return state.dirReady ? refreshShelfFromDisk() : null;
+      });
+    }).catch(function () { return null; });
+  }
+  function refreshShelfFromDisk() {
+    if (!state.dirHandle || !state.dirReady || typeof state.dirHandle.values !== 'function') return Promise.resolve(false);
+    var seen = [];
+    var it = state.dirHandle.values();
+    function step() {
+      return it.next().then(function (r) {
+        if (r.done) return seen;
+        var entry = r.value;
+        if (entry.kind === 'file' && /\.txt$/i.test(entry.name)) {
+          seen.push(entry.name);
+          return entry.getFile().then(function (file) {
+            var exist = null;
+            for (var i = 0; i < state.books.length; i++) if (state.books[i].name === entry.name) { exist = state.books[i]; break; }
+            if (exist) {
+              exist.size = file.size;
+              exist.missing = false;
+            } else {
+              state.books.push({
+                id: 'b' + Math.random().toString(36).slice(2, 9),
+                name: entry.name, size: file.size, encoding: '',
+                lastReadAt: null, pos: 0, percent: 0, addedAt: nowIso(), missing: false
+              });
+            }
+            return step();
+          });
+        }
+        return step();
+      });
+    }
+    return step().then(function () {
+      state.books.forEach(function (b) { b.missing = seen.indexOf(b.name) < 0; });
+      saveBooks();
+      renderAll();
+      return true;
+    }).catch(function () { return false; });
+  }
+  function getFileHandleByName(name) {
+    if (!state.dirHandle || !state.dirReady) return Promise.resolve(null);
+    return state.dirHandle.getFileHandle(name).catch(function () { return null; });
+  }
+
+  /* =========================================================
+   * 22. 书架：上传（进度 / 取消 / 最小化 / 上限 / 编码提示）
+   * =======================================================*/
+  function uploadingCount() {
+    return state.uploads.filter(function (u) { return u.status === 'reading' || u.status === 'writing'; }).length;
+  }
+  function renderUploads() {
+    var panel = $('upload-panel');
+    if (!panel) return;
+    setHidden(panel, !state.uploads.length);
+    if (!state.uploads.length) return;
+    if (state.uploadMin) panel.classList.add('min'); else panel.classList.remove('min');
+    var done = state.uploads.filter(function (u) { return u.status === 'done'; }).length;
+    var failed = state.uploads.filter(function (u) { return u.status === 'error'; }).length;
+    var sum = $('upload-summary');
+    if (sum) sum.textContent = '（' + done + ' 成功 / ' + failed + ' 失败 / 共 ' + state.uploads.length + '）';
+    var list = $('upload-list');
+    clear(list);
+    state.uploads.forEach(function (u) {
+      var pct = u.size ? Math.min(100, Math.round(u.loaded / u.size * 100)) : 0;
+      var label = u.status === 'done' ? '完成'
+        : u.status === 'error' ? '失败'
+        : u.status === 'canceled' ? '已取消'
+        : (u.status === 'writing' ? '写入中' : '读取中 ' + pct + '%');
+      list.appendChild(h('div', { class: 'upload-item' }, [
+        h('div', { class: 'row' }, [
+          h('span', { class: 'name', text: u.name, title: u.name }),
+          h('span', { class: 'badge' + (u.status === 'error' ? ' warn' : (u.status === 'done' ? ' done' : '')), text: label })
+        ]),
+        h('div', { class: 'progress' }, [h('i', { style: 'width:' + (u.status === 'done' ? 100 : pct) + '%' })]),
+        (u.error ? h('div', { class: 'subline', text: u.error }) : null),
+        (u.warning ? h('div', { class: 'subline', text: u.warning }) : null)
+      ]));
+    });
+  }
+  /* 分块读取以获得进度，并可随时取消 */
+  function readFileWithProgress(file, item) {
+    var CHUNK = 1024 * 1024;
+    var chunks = [];
+    var offset = 0;
+    function step() {
+      if (item.ctrl.canceled) return Promise.reject(new Error('canceled'));
+      if (offset >= file.size) {
+        return new Promise(function (resolve) {
+          var blob = new Blob(chunks);
+          if (typeof FileReader === 'function') {
+            var fr = new FileReader();
+            fr.onload = function () { resolve(fr.result); };
+            fr.onerror = function () { resolve(null); };
+            fr.readAsArrayBuffer(blob);
+          } else if (typeof blob.arrayBuffer === 'function') {
+            blob.arrayBuffer().then(resolve).catch(function () { resolve(null); });
+          } else resolve(null);
+        });
+      }
+      var slice = file.slice(offset, Math.min(offset + CHUNK, file.size));
+      var stepDone = function (buf) {
+        chunks.push(buf);
+        offset += buf.byteLength;
+        item.loaded = offset;
+        renderUploads();
+        return step();
+      };
+      if (typeof slice.arrayBuffer === 'function') return slice.arrayBuffer().then(stepDone);
+      return new Promise(function (resolve) {
+        var fr = new FileReader();
+        fr.onload = function () { resolve(fr.result); };
+        fr.onerror = function () { resolve(null); };
+        fr.readAsArrayBuffer(slice);
+      }).then(stepDone);
+    }
+    return step();
+  }
+  function uploadOne(file) {
+    var item = {
+      id: 'u' + (++state.uploadSeq),
+      name: file.name,
+      size: file.size,
+      loaded: 0,
+      status: 'reading',
+      error: '',
+      warning: '',
+      encoding: '',
+      ctrl: { canceled: false }
+    };
+    state.uploads.push(item);
+    renderUploads();
+
+    if (file.size > BOOK_MAX_BYTES) {
+      item.status = 'error';
+      item.error = '超过单本上限 ' + byteText(BOOK_MAX_BYTES) + '（实际 ' + byteText(file.size) + '）';
+      finishUploadsIfIdle();
+      return Promise.resolve(item);
+    }
+    var used = shelfTotalBytes();
+    if (used + file.size > SHELF_MAX_BYTES) {
+      item.status = 'error';
+      item.error = '超过书架总量上限 ' + byteText(SHELF_MAX_BYTES) + '（已用 ' + byteText(used) + '）';
+      finishUploadsIfIdle();
+      return Promise.resolve(item);
+    }
+
+    return readFileWithProgress(file, item).then(function (buffer) {
+      if (item.ctrl.canceled) {
+        item.status = 'canceled';
+        item.error = '已取消（未写入任何内容）';
+        return null;
+      }
+      if (!buffer) throw new Error('读取文件内容失败');
+      var sample = buffer.byteLength > SAMPLE_BYTES ? new Uint8Array(buffer, 0, SAMPLE_BYTES) : new Uint8Array(buffer);
+      var encoding = sniffEncoding(sample);
+      var quality = decodeQuality(decodeBuffer(buffer, encoding));
+      item.encoding = encoding;
+      if (quality < 0.98) {
+        item.warning = '编码可能异常：用 ' + encText(encoding) + ' 解码出现乱码字符（占比 ' +
+          ((1 - quality) * 100).toFixed(1) + '%），阅读显示异常时可换一份编码正确的文件。';
+      }
+      item.status = 'writing';
+      renderUploads();
+      return state.dirHandle.getFileHandle(file.name, { create: true })
+        .then(function (fh) { return fh.createWritable(); })
+        .then(function (writable) {
+          return writable.write(buffer).then(function () {
+            if (item.ctrl.canceled) {
+              /* 取消后同步删除已写入的内容 */
+              return writable.abort().catch(function () { return null; }).then(function () {
+                return state.dirHandle.removeEntry(file.name).catch(function () { return null; });
+              }).then(function () {
+                item.status = 'canceled';
+                item.error = '已取消：已删除写入的内容';
+              });
+            }
+            return writable.close().then(function () {
+              item.status = 'done';
+              var bk = null;
+              state.books.forEach(function (b) { if (b.name === file.name) bk = b; });
+              if (!bk) {
+                state.books.push({
+                  id: 'b' + Math.random().toString(36).slice(2, 9),
+                  name: file.name, size: file.size, encoding: encoding,
+                  lastReadAt: null, pos: 0, percent: 0, addedAt: nowIso(), missing: false
+                });
+              } else {
+                bk.size = file.size; bk.encoding = encoding; bk.missing = false;
+              }
+              saveBooks();
+            });
+          });
+        });
+    }).catch(function (err) {
+      if (item.ctrl.canceled) {
+        item.status = 'canceled';
+        item.error = '已取消（未写入任何内容）';
+      } else {
+        item.status = 'error';
+        item.error = '写入失败：' + (err && err.message ? err.message : err);
+      }
+    }).then(function () {
+      renderAll();
+      finishUploadsIfIdle();
+      return item;
+    });
+  }
+  function finishUploadsIfIdle() {
+    renderUploads();
+    if (uploadingCount()) return;
+    var failed = state.uploads.filter(function (u) { return u.status === 'error'; });
+    var done = state.uploads.filter(function (u) { return u.status === 'done'; });
+    playCue('upload');
+    if (failed.length) toast('上传完成：' + done.length + ' 成功，' + failed.length + ' 失败');
+    else if (done.length) toast('上传完成：' + done.length + ' 个文件');
+  }
+  function cancelUploads() {
+    state.uploads.forEach(function (u) {
+      if (u.status === 'reading' || u.status === 'writing') {
+        u.ctrl.canceled = true;
+        if (u.status === 'reading') { u.status = 'canceled'; u.error = '已取消（未写入任何内容）'; }
+      }
+    });
+    renderUploads();
+    toast('已取消上传（已写入的内容会同步删除）');
+  }
+  function pickFiles() {
+    if (typeof window.showOpenFilePicker !== 'function') {
+      ask('无法选择文件', '当前环境不支持 showOpenFilePicker，请使用 Chrome / Edge 并通过 http://127.0.0.1:8000 访问。', [
+        { label: '知道了', value: 'ok', primary: true }
+      ]);
+      return;
+    }
+    window.showOpenFilePicker({
+      multiple: true,
+      types: [{ description: '文本文档', accept: { 'text/plain': ['.txt'] } }]
+    }).then(function (handles) {
+      state.uploadMin = false;
+      var chain = Promise.resolve();
+      handles.forEach(function (fh) {
+        chain = chain.then(function () {
+          return fh.getFile().then(function (file) { return uploadOne(file); });
+        });
+      });
+      return chain;
+    }).catch(function (err) {
+      if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
+      ask('上传失败', '无法读取所选文件：' + (err && err.message ? err.message : err), [
+        { label: '知道了', value: 'ok', primary: true }
+      ]);
+    });
+  }
+  function pickBooksToUpload() {
+    if (!fsSupported()) {
+      ask('当前浏览器不支持', '上传需要 File System Access API：请使用 Chrome / Edge 并通过 http://127.0.0.1:8000 访问。', [
+        { label: '知道了', value: 'ok', primary: true }
+      ]);
+      return;
+    }
+    if (!state.dirHandle || !state.dirReady) {
+      ask('请先选择 book 文件夹', '上传需要先授权一个本地文件夹用于存放 txt。点击「确定」后选择文件夹，再选择文件。', [
+        { label: '取消', value: null, primary: false },
+        { label: '确定', value: 'ok', primary: true }
+      ]).then(function (r) {
+        if (r !== 'ok') return;
+        pickBookFolder().then(function (handle) { if (handle) pickFiles(); });
+      });
+      return;
+    }
+    pickFiles();
+  }
+
+  /* =========================================================
+   * 23. 书架：阅读（惰性分页 + 进度 + 时间）
+   * =======================================================*/
+  function totalPages(size) { return Math.max(1, Math.ceil((size || 0) / READ_PAGE_BYTES)); }
+  function pageFromBookPos(b) { return Math.min(totalPages(b.size), Math.floor((b.pos || 0) / READ_PAGE_BYTES) + 1); }
+  function renderShelf() {
+    var grid = $('shelf-grid');
+    if (!grid) return;
+    var used = shelfTotalBytes();
+    var stat = $('shelf-stat');
+    if (stat) {
+      stat.textContent = '共 ' + state.books.length + ' 本 · 已用 ' + byteText(used) + ' / ' + byteText(SHELF_MAX_BYTES) +
+        ' · 单本上限 ' + byteText(BOOK_MAX_BYTES);
+    }
+    var path = $('shelf-path');
+    if (path) {
+      path.textContent = state.bookDirName
+        ? ('book 文件夹：' + state.bookDirName + (state.dirReady ? '（已授权）' : '（需重新授权：点「选择 / 更换 book 文件夹」）'))
+        : '尚未选择 book 文件夹';
+    }
+    var nb = $('nav-shelf-badge');
+    if (nb) nb.textContent = String(state.books.length);
+    var su = $('set-shelf-usage');
+    if (su) su.textContent = '文件夹：' + (state.bookDirName || '未选择') + '；已用 ' + byteText(used) + ' / ' +
+      byteText(SHELF_MAX_BYTES) + '；书架不计入待办备份。';
+
+    var support = $('shelf-support');
+    if (support) {
+      var problems = [];
+      if (isFileProtocol()) problems.push('当前是 file:// 协议：书架不可用，请用本地 HTTP 服务访问（python -m http.server 8000 --bind 127.0.0.1）。');
+      if (!fsSupported()) problems.push('当前浏览器不支持 File System Access API：请使用 Chrome 或 Edge（Firefox 不支持）。');
+      if (problems.length) {
+        support.hidden = false;
+        clear(support);
+        support.appendChild(h('b', { text: '运行前提未满足' }));
+        var ul = h('ul');
+        problems.forEach(function (p) { ul.appendChild(h('li', { text: p })); });
+        support.appendChild(ul);
+      } else support.hidden = true;
+    }
+
+    var info = $('shelf-info');
+    if (info) {
+      var latest = state.books.slice().filter(function (b) { return b.lastReadAt; })
+        .sort(function (a, b) { return (tsOf(b.lastReadAt) || 0) - (tsOf(a.lastReadAt) || 0); })[0];
+      info.textContent = state.books.length
+        ? ('最近阅读：' + (latest ? (latest.name + '（' + humanAgo(latest.lastReadAt) + '）') : '暂无阅读记录'))
+        : '—';
+    }
+
+    clear(grid);
+    var empty = $('shelf-empty');
+    if (!state.books.length) { empty.hidden = false; return; }
+    empty.hidden = true;
+    state.books.slice().sort(function (a, b) { return (tsOf(b.lastReadAt) || 0) - (tsOf(a.lastReadAt) || 0); })
+      .forEach(function (b) {
+        var pct = Math.max(0, Math.min(100, Math.round(b.percent || 0)));
+        grid.appendChild(h('div', { class: 'book-card' + (b.missing ? ' missing' : '') }, [
+          h('div', { class: 'book-title', text: b.name.replace(/\.txt$/i, '') }),
+          h('div', { class: 'book-meta' }, [
+            h('span', { class: 'badge', text: byteText(b.size) }),
+            (b.encoding ? h('span', { class: 'badge', text: encText(b.encoding) }) : null),
+            (b.missing ? h('span', { class: 'badge warn', text: '文件不在文件夹中' }) : null)
+          ]),
+          h('div', { class: 'progress' }, [h('i', { style: 'width:' + pct + '%' })]),
+          h('div', { class: 'book-meta' }, [
+            h('span', { text: '进度 ' + pct + '%（第 ' + pageFromBookPos(b) + ' / ' + totalPages(b.size) + ' 页）' }),
+            h('span', { text: '上次浏览：' + humanAgo(b.lastReadAt) })
+          ]),
+          h('div', { class: 'book-ops' }, [
+            h('button', { class: 'btn btn-sm btn-primary', type: 'button', text: '阅读', onclick: function () { openReader(b.id); } }),
+            h('button', {
+              class: 'btn btn-sm', type: 'button', text: '从头开始',
+              onclick: function () { b.pos = 0; b.percent = 0; saveBooks(); openReader(b.id); }
+            }),
+            h('button', { class: 'btn btn-sm btn-danger', type: 'button', text: '删除', onclick: function () { confirmDeleteBook(b.id); } })
+          ])
+        ]));
+      });
+  }
+  function openReader(id) {
+    var b = getBook(id);
+    if (!b) return;
+    if (!state.dirReady || !state.dirHandle) {
+      ask('需要文件夹授权', '阅读本地图书需要重新授权 book 文件夹（网页不会自动读取磁盘）。点击「授权」后重新选择即可。', [
+        { label: '取消', value: null, primary: false },
+        { label: '授权', value: 'ok', primary: true }
+      ]).then(function (r) {
+        if (r !== 'ok') return;
+        pickBookFolder().then(function (h2) { if (h2) openReader(id); });
+      });
+      return;
+    }
+    var total = totalPages(b.size);
+    var page = Math.min(total, Math.floor((b.pos || 0) / READ_PAGE_BYTES) + 1);
+    state.reader = { id: id, name: b.name, size: b.size, encoding: b.encoding, page: page, totalPages: total, text: '' };
+    $('reader-title').textContent = b.name.replace(/\.txt$/i, '');
+    $('reader-encoding').textContent = b.encoding ? encText(b.encoding) : '编码未知';
+    $('reader-text').textContent = '（正在载入…）';
+    $('reader-range').max = String(total);
+    $('reader-range').value = String(page);
+    setHidden($('reader'), false);
+    loadReaderPage(page);
+  }
+  function loadReaderPage(page) {
+    var r = state.reader;
+    if (!r) return Promise.resolve(false);
+    r.page = Math.max(1, Math.min(r.totalPages, page || 1));
+    $('reader-page').textContent = '第 ' + r.page + ' / ' + r.totalPages + ' 页';
+    $('reader-percent').textContent = Math.round((r.page - 1) / r.totalPages * 100) + '%';
+    $('reader-range').value = String(r.page);
+    var start = (r.page - 1) * READ_PAGE_BYTES;
+    var end = Math.min(start + READ_PAGE_BYTES, r.size);
+    var el = $('reader-text');
+    el.textContent = '（正在载入…）';
+    return getFileHandleByName(r.name).then(function (fh) {
+      if (!fh) throw new Error('文件不存在（可能已被移动或删除）');
+      return fh.getFile();
+    }).then(function (file) {
+      return file.slice(start, end).arrayBuffer();
+    }).then(function (buf) {
+      var sample = buf.byteLength > 65536 ? new Uint8Array(buf, 0, 65536) : new Uint8Array(buf);
+      var enc = r.encoding || sniffEncoding(sample);
+      r.encoding = enc;
+      $('reader-encoding').textContent = encText(enc);
+      var text = decodeBuffer(buf, enc);
+      if (start > 0) text = text.replace(/^[^\n]*\n/, '');
+      r.text = text;
+      el.textContent = text || '（本页无内容）';
+      $('reader-body').scrollTop = 0;
+      var b = getBook(r.id);
+      if (b) {
+        if (b.encoding !== enc) b.encoding = enc;
+        b.pos = start;
+        b.percent = Math.min(100, Math.round(start / Math.max(1, b.size) * 100));
+        b.lastReadAt = nowIso();
+        saveBooks();
+        renderShelf();
+      }
+      return true;
+    }).catch(function (err) {
+      el.textContent = '读取失败：' + (err && err.message ? err.message : err);
+      return false;
+    });
+  }
+  function closeReader() {
+    state.reader = null;
+    setHidden($('reader'), true);
+    renderAll();
+  }
+  function confirmDeleteBook(id) {
+    var b = getBook(id);
+    if (!b) return;
+    ask('删除图书', '将从 book 文件夹删除「' + b.name + '」（同时清除它的阅读进度）。此操作不可撤销，确认删除？', [
+      { label: '取消', value: null, primary: false },
+      { label: '确认删除', value: 'ok', primary: true }
+    ]).then(function (r) {
+      if (r !== 'ok') return;
+      var done = (state.dirReady && state.dirHandle && typeof state.dirHandle.removeEntry === 'function')
+        ? state.dirHandle.removeEntry(b.name).catch(function () { return null; })
+        : Promise.resolve(null);
+      done.then(function () {
+        state.books = state.books.filter(function (x) { return x.id !== id; });
+        saveBooks();
+        playCue('action');
+        renderAll();
+        toast('已删除：' + b.name);
+      });
+    });
+  }
+
+
+  /* =========================================================
+   * 24. 导出 / 导入（仅待办，书架不计入）
+   * =======================================================*/
+  function buildExportObject() {
+    var dismissed = {};
+    state.todos.forEach(function (t) { if (state.dismissed[t.id]) dismissed[t.id] = true; });
+    return {
+      app: APP_NAME,
+      kind: 'zapp-backup',
+      version: APP_VERSION,
+      schema: 1,
+      exportedAt: nowIso(),
+      counts: {
+        todos: state.todos.length,
+        live: liveTodos().length,
+        done: liveTodos().filter(function (t) { return t.done; }).length,
+        trash: trashTodos().length
+      },
+      settings: { theme: state.theme, sounds: state.sounds },
+      todos: state.todos,
+      remindersDismissed: dismissed,
+      reminderSnapshot: state.snapshot,
+      note: '书架（图书文件与阅读进度）不计入本备份。'
+    };
+  }
+  function doExport() {
+    var data = buildExportObject();
+    var text = JSON.stringify(data, null, 2);
+    var d = new Date();
+    var name = 'zapp-backup-' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) +
+      '-' + pad2(d.getHours()) + pad2(d.getMinutes()) + '.json';
+    try {
+      var blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+      toast('已导出 ' + data.counts.todos + ' 条记录（不含书架）到 ' + name);
+    } catch (e) {
+      ask('导出失败', '浏览器阻止了自动下载，请手动复制下面的 JSON 保存为 ' + name + '：\n\n' + text.slice(0, 1200) +
+        (text.length > 1200 ? '\n…（内容过长已截断，请更换浏览器重试）' : ''), [
+        { label: '知道了', value: 'ok', primary: true }
+      ]);
+    }
+  }
+  function importFromText(text, sourceLabel) {
+    var obj;
+    try {
+      obj = JSON.parse(text);
+    } catch (e) {
+      ask('导入失败', '文件不是合法的 JSON，无法解析。', [{ label: '知道了', value: 'ok', primary: true }]);
+      return;
+    }
+    var rawList = null;
+    if (obj && Array.isArray(obj.todos)) rawList = obj.todos;
+    else if (Array.isArray(obj)) rawList = obj;
+    if (!rawList) {
+      ask('导入失败', '这个 JSON 里没有找到待办数据（需要包含 todos 数组，或本身就是待办数组）。', [
+        { label: '知道了', value: 'ok', primary: true }
+      ]);
+      return;
+    }
+    var incoming = rawList.map(normalizeTodo).filter(Boolean);
+    var dismissed = isPlainObject(obj && obj.remindersDismissed) ? obj.remindersDismissed : {};
+    ask('导入 JSON 备份',
+      '来源：' + sourceLabel + '\n文件包含 ' + rawList.length + ' 条记录，其中有效 ' + incoming.length + ' 条。\n' +
+      '当前应用中有 ' + state.todos.length + ' 条记录（回收站 ' + trashTodos().length + ' 条）。\n\n' +
+      '「合并」保留现有记录，按 id 去重后追加；「覆盖」清空现有记录，只保留文件内容。', [
+        { label: '取消', value: null, primary: false },
+        { label: '合并导入', value: 'merge', primary: false },
+        { label: '覆盖导入', value: 'replace', primary: true }
+      ]).then(function (r) {
+        if (!r) return;
+        var snapshotBefore = state.snapshot;
+        var allBefore = state.todos.slice();
+        if (r === 'replace') {
+          state.todos = incoming;
+          state.dismissed = {};
+          Object.keys(dismissed).forEach(function (k) { state.dismissed[k] = true; });
+          state.snapshot = isPlainObject(obj.reminderSnapshot) ? obj.reminderSnapshot : null;
+        } else {
+          var ids = {};
+          state.todos.forEach(function (t) { ids[t.id] = true; });
+          incoming.forEach(function (t) {
+            if (ids[t.id]) t.id = uid();
+            ids[t.id] = true;
+            state.todos.push(t);
+          });
+        }
+        pushUndo('导入（' + (r === 'replace' ? '覆盖' : '合并') + '）', function () {
+          state.todos = allBefore;
+          state.snapshot = snapshotBefore;
+        });
+        saveTodos(); saveDismissed(); saveSnapshot();
+        var withDate = incoming.filter(function (t) { return t.date; })[0];
+        if (withDate) {
+          var d = parseDateKey(withDate.date);
+          state.viewYear = d.getFullYear();
+          state.viewMonth = d.getMonth();
+        }
+        renderAll();
+        toast(r === 'replace' ? ('已覆盖导入 ' + incoming.length + ' 条记录') : ('已合并导入 ' + incoming.length + ' 条记录'));
+      });
+  }
+  function pickImportFile() {
+    var input = h('input', { type: 'file', accept: '.json,application/json', style: 'display:none' });
+    document.body.appendChild(input);
+    input.addEventListener('change', function () {
+      var f = input.files && input.files[0];
+      if (!f) { document.body.removeChild(input); return; }
+      var reader = new FileReader();
+      reader.onload = function () {
+        document.body.removeChild(input);
+        importFromText(String(reader.result || ''), f.name);
+      };
+      reader.onerror = function () {
+        document.body.removeChild(input);
+        ask('读取失败', '无法读取所选文件。', [{ label: '知道了', value: 'ok', primary: true }]);
+      };
+      reader.readAsText(f, 'utf-8');
+    });
+    input.click();
+  }
+
+  /* =========================================================
+   * 25. 主题 / 帮助 / 渲染入口
+   * =======================================================*/
+  function applyTheme() {
+    document.documentElement.setAttribute('data-theme', state.theme);
+    renderSounds();
+  }
+  function showHelp() {
+    ask('使用说明 · 重要提示',
+      '1) 提醒只在页面打开时生效：页面内弹窗 + 可选提示音（设置页可按功能分别开关）；不使用浏览器/系统通知。\n\n' +
+      '2) 待办：日历点选日期筛选；「批量新建」内可多选日期或区间（含首尾），单次上限 ' + BATCH_MAX + ' 条，超出部分不会创建并逐条列出失败原因。\n\n' +
+      '3) 回收站在待办页右上角悬浮（随滚动、避让页脚）；删除的待办保留 72 小时，自首次删除起算不重复计时；关闭页面期间不清理，下次打开时才清除过期条目。\n\n' +
+      '4) 撤销按钮在待办页右下角常驻：无历史时置灰但不隐藏，可回退最近 ' + UNDO_LIMIT + ' 步。\n\n' +
+      '5) 书架需要本地 HTTP 服务（python -m http.server 8000 --bind 127.0.0.1 → http://127.0.0.1:8000），仅 Chrome / Edge 支持；首次使用须手动选择本地 book 文件夹授权读写，网页不会自动读取磁盘。\n\n' +
+      '6) 上传 txt：自动识别编码（UTF-8 / UTF-16 / GB18030 等），异常会提示；单本上限 ' + byteText(BOOK_MAX_BYTES) +
+      '，书架总量上限 ' + byteText(SHELF_MAX_BYTES) + '；有进度条，可取消或最小化，取消会删除已写入内容。\n\n' +
+      '7) 书架不计入待办备份；删除图书有确认弹窗，并会删除 book 文件夹中的对应文件。\n\n' +
+      '8) 数据仅存本机：待办与阅读进度在 localStorage，图书正文在你选择的本地文件夹；清除浏览器数据会丢失待办与进度。\n\n' +
+      '9) 快捷键：N 新建待办，B 批量新建，← / → 切换月份，T 回到今天，Esc 关闭弹窗 / 退出阅读。',
+      [{ label: '知道了', value: 'ok', primary: true }]);
+  }
+  function renderAll() {
+    renderFloats();
+    renderCalendar();
+    renderTodos();
+    renderTrash();
+    renderUndo();
+    renderShelf();
+    renderUploads();
+    renderSounds();
+  }
+
+  /* =========================================================
+   * 26. 事件绑定与启动
+   * =======================================================*/
+  function bindEvents() {
+    $('nav-todo').addEventListener('click', function () { setRoute('todo'); });
+    $('nav-shelf').addEventListener('click', function () { setRoute('shelf'); });
+    $('nav-gacha').addEventListener('click', function () { setRoute('gacha'); });
+    $('nav-settings').addEventListener('click', function () { setRoute('settings'); });
+
+    $('btn-new').addEventListener('click', function () { openEditor(null); });
+    $('btn-batch').addEventListener('click', function () { openBatch(); });
+    $('btn-export').addEventListener('click', doExport);
+    $('btn-import').addEventListener('click', pickImportFile);
+    $('btn-help').addEventListener('click', showHelp);
+    $('btn-clear-done').addEventListener('click', clearCompleted);
+    $('btn-undo').addEventListener('click', doUndo);
+    $('btn-empty-trash').addEventListener('click', emptyTrash);
+    $('btn-purge-expired').addEventListener('click', function () {
+      var n = purgeExpired(true);
+      renderAll(); syncFloats();
+      toast(n ? ('已清除 ' + n + ' 条过期条目') : '没有过期条目需要清理');
+    });
+    $('btn-trash-float').addEventListener('click', function () {
+      state.trashOpen = !state.trashOpen;
+      if (state.trashOpen) purgeExpired(true);
+      renderAll(); syncFloats();
+    });
+    $('btn-trash-close').addEventListener('click', function () {
+      state.trashOpen = false;
+      renderAll();
+    });
+
+    $('btn-today').addEventListener('click', function () {
+      var d = new Date();
+      state.viewYear = d.getFullYear();
+      state.viewMonth = d.getMonth();
+      state.selectedDate = todayKey();
+      renderAll();
+    });
+    $('btn-filter-all').addEventListener('click', function () { state.selectedDate = null; renderAll(); });
+    $('btn-filter-today').addEventListener('click', function () { state.selectedDate = todayKey(); renderAll(); });
+    $('cal-prev').addEventListener('click', function () {
+      var d = new Date(state.viewYear, state.viewMonth - 1, 1);
+      state.viewYear = d.getFullYear(); state.viewMonth = d.getMonth(); renderAll();
+    });
+    $('cal-next').addEventListener('click', function () {
+      var d = new Date(state.viewYear, state.viewMonth + 1, 1);
+      state.viewYear = d.getFullYear(); state.viewMonth = d.getMonth(); renderAll();
+    });
+
+    $('set-theme').addEventListener('click', function () {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      lsSet(STORAGE.theme, state.theme);
+      applyTheme();
+    });
+    $('sw-sound').addEventListener('click', function () { toggleSound('master'); });
+    $('sw-sound-reminder').addEventListener('click', function () { toggleSound('reminder'); });
+    $('sw-sound-upload').addEventListener('click', function () { toggleSound('upload'); });
+    $('sw-sound-action').addEventListener('click', function () { toggleSound('action'); });
+    $('set-shelf-pick').addEventListener('click', function () { pickBookFolder(); });
+
+    $('btn-shelf-pick').addEventListener('click', function () { pickBookFolder(); });
+    $('btn-shelf-upload').addEventListener('click', pickBooksToUpload);
+    $('btn-upload-min').addEventListener('click', function () {
+      state.uploadMin = !state.uploadMin;
+      renderUploads();
+      var b = $('btn-upload-min');
+      if (b) b.textContent = state.uploadMin ? '展开' : '最小化';
+    });
+    $('btn-upload-cancel').addEventListener('click', cancelUploads);
+    $('btn-reader-close').addEventListener('click', closeReader);
+    $('btn-reader-prev').addEventListener('click', function () { if (state.reader) loadReaderPage(state.reader.page - 1); });
+    $('btn-reader-next').addEventListener('click', function () { if (state.reader) loadReaderPage(state.reader.page + 1); });
+    $('btn-reader-toc').addEventListener('click', function () { if (state.reader) loadReaderPage(1); });
+    $('reader-range').addEventListener('change', function (ev) {
+      if (state.reader) loadReaderPage(parseInt(ev.target.value, 10) || 1);
+    });
+
+    overlay.addEventListener('click', function (ev) {
+      if (ev.target !== overlay) return;
+      if (dialogState.mode === 'reminder' || dialogState.mode === 'form') return;
+      if (dialogState.mode === 'ask') closeDialog(null);
+    });
+
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && !overlay.hidden) {
+        if (dialogState.mode === 'ask' || dialogState.mode === 'form') closeDialog(null);
+        return;
+      }
+      if (ev.key === 'Escape' && state.reader) { closeReader(); return; }
+      var tag = (ev.target && ev.target.tagName) ? ev.target.tagName.toLowerCase() : '';
+      if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+      if (!overlay.hidden || state.reader) return;
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      if (state.route !== 'todo') return;
+      if (ev.key === 'n' || ev.key === 'N') { ev.preventDefault(); openEditor(null); }
+      else if (ev.key === 'b' || ev.key === 'B') { ev.preventDefault(); openBatch(); }
+      else if (ev.key === 't' || ev.key === 'T') { state.selectedDate = todayKey(); renderAll(); }
+      else if (ev.key === 'ArrowLeft') {
+        var d1 = new Date(state.viewYear, state.viewMonth - 1, 1);
+        state.viewYear = d1.getFullYear(); state.viewMonth = d1.getMonth(); renderAll();
+      } else if (ev.key === 'ArrowRight') {
+        var d2 = new Date(state.viewYear, state.viewMonth + 1, 1);
+        state.viewYear = d2.getFullYear(); state.viewMonth = d2.getMonth(); renderAll();
+      }
+    });
+
+    window.addEventListener('scroll', onScrollOrResize, { passive: true });
+    window.addEventListener('resize', onScrollOrResize);
+    window.addEventListener('storage', function (ev) {
+      if (!ev.key) return;
+      [STORAGE.todos, STORAGE.dismissed, STORAGE.snapshot, STORAGE.pick, STORAGE.books, STORAGE.sound]
+        .forEach(function (k) {
+          if (ev.key === k) { loadAll(); applyTheme(); renderAll(); }
+        });
+    });
+  }
+
+  function init() {
+    overlay = $('overlay');
+    modal = $('modal');
+    loadAll();
+    applyTheme();
+    purgeExpired(true);
+    if (state.snapshot) {
+      var before = state.snapshot.ids.length;
+      state.snapshot.ids = state.snapshot.ids.filter(function (id) { return !!getTodo(id); });
+      if (state.snapshot.ids.length !== before) saveSnapshot();
+    }
+    var withDate = liveTodos().filter(function (t) { return t.date; })[0];
+    if (withDate) {
+      var d = parseDateKey(withDate.date);
+      state.viewYear = d.getFullYear();
+      state.viewMonth = d.getMonth();
+    }
+    bindEvents();
+    setRoute('todo');
+    renderAll();
+    syncFloats();
+    restoreDirHandle().then(function () { renderAll(); syncFloats(); });
+
+    setInterval(checkReminders, 15000);
+    setTimeout(checkReminders, 800);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
